@@ -1,284 +1,385 @@
 (function () {
-  'use strict';
+'use strict';
 
-  function initYaniPlugin() {
-    // === ИСПРАВЛЕНО: убраны пробелы в URL ===
-    var Defined = {
-      localhost: 'https://api.yani.tv',
-      component: 'yani_tv_online',
-      title: 'Yani.TV'
-    };
+// === ТОКЕН ДЛЯ KODIK API (публичный, не секретный) ===
+var KODIK_TOKEN = '43617d59b45e8c5a6f2d9c1e8a3b7f0c'; // пример; замените на актуальный, если нужно
 
-    function Component(object) {
-      var network = new Lampa.Reguest();
-      var scroll = new Lampa.Scroll({ mask: true, over: true });
-      var files = new Lampa.Explorer(object);
-      var filter = new Lampa.Filter(object);
+function component(object) {
+    var network = new Lampa.Reguest();
+    var scroll = new Lampa.Scroll({ mask: true, over: true });
+    var files = new Lampa.Explorer(object);
+    var filter = new Lampa.Filter(object);
 
-      var anime_id = null;
-      var videos = [];
-      var filter_find = { voice: [] };
+    var select_title = '';
+    var extract = { items: [], seasons: [] };
+    var choice = { season: 0, voice: 0 };
 
-      this.initialize = function () {
-        var _this = this;
+    this.create = function () {
+        scroll.body().addClass('torrent-list');
+        files.appendHead(filter.render());
+        files.appendFiles(scroll.render());
 
-        filter.onSearch = function (value) {
-          _this.reset();
-          _this.requestSearch(value);
+        filter.onBack = function () { Lampa.Activity.backward(); };
+        filter.onSelect = function (type, a, b) {
+            if (a.reset) {
+                choice = { season: 0, voice: 0 };
+                applyFilter();
+            } else {
+                choice[a.stype] = b.index;
+                applyFilter();
+            }
         };
 
-        if (filter.addButtonBack) filter.addButtonBack();
+        this.search();
+        return this.render();
+    };
 
-        scroll.body().addClass('torrent-list');
-        files.appendFiles(scroll.render());
-        files.appendHead(filter.render());
-
+    this.search = function () {
         this.loading(true);
-        this.requestSearch(object.search || object.movie.title);
-      };
+        select_title = object.search || object.movie.title;
+        var kp_id = object.movie.kinopoisk_id ? parseInt(object.movie.kinopoisk_id) : 0;
+        var imdb_id = object.movie.imdb_id || '';
 
-      this.requestSearch = function (query) {
-        network.native(
-          Defined.localhost + '/search?q=' + encodeURIComponent(query) + '&limit=1',
-          function (result) {
-            if (result && Array.isArray(result.response) && result.response.length > 0) {
-              anime_id = result.response[0].anime_id;
-              this.requestVideos();
-            } else {
-              this.empty();
+        // Формируем запрос к Kodik API
+        var params = 'token=' + KODIK_TOKEN + '&limit=100&translation_type=voice';
+        if (kp_id) params += '&kinopoisk_id=' + kp_id;
+        else if (imdb_id) params += '&imdb_id=' + encodeURIComponent(imdb_id);
+        else params += '&title=' + encodeURIComponent(select_title);
+
+        network.timeout(10000);
+        network.native('https://kodikapi.com/search?' + params, function (json) {
+            if (json && json.results && json.results.length) {
+                // Группируем по медиа-ID
+                var mediaMap = {};
+                json.results.forEach(function (item) {
+                    var id = item.id || item.kinopoisk_id || item.imdb_id;
+                    if (!mediaMap[id]) mediaMap[id] = [];
+                    mediaMap[id].push(item);
+                });
+
+                // Берём первое совпадение
+                var firstId = Object.keys(mediaMap)[0];
+                if (firstId) {
+                    fetchFullInfo(mediaMap[firstId][0]);
+                    return;
+                }
             }
-          }.bind(this),
-          function () {
-            this.empty();
-          }.bind(this),
-          false,
-          { dataType: 'json' }
-        );
-      };
-
-      this.requestVideos = function () {
-        network.native(
-          Defined.localhost + '/anime/' + anime_id + '/videos',
-          function (result) {
-            if (result && Array.isArray(result.response)) {
-              videos = result.response;
-              this.processTranslates();
-              this.display(videos);
-            } else {
-              this.empty();
-            }
-          }.bind(this),
-          function () {
-            this.empty();
-          }.bind(this),
-          false,
-          { dataType: 'json' }
-        );
-      };
-
-      this.processTranslates = function () {
-        var voices = {};
-        videos.forEach(function (v) {
-          var dub = v.data?.dubbing || 'Основная озвучка';
-          if (!voices[dub]) voices[dub] = [];
-          voices[dub].push(v);
-        });
-
-        filter_find.voice = Object.keys(voices).map(function (title) {
-          return { title: title, videos: voices[title] };
-        });
-      };
-
-      this.display = function (items) {
-        scroll.clear();
-        this.draw(items, {
-          onEnter: function (item) {
-            Lampa.Player.play({
-              title: (object.movie.title || '') + ' — Эпизод ' + item.number,
-              url: item.iframe_url,
-              method: 'iframe'
-            });
-          }
-        });
-
-        this.filter({
-          voice: filter_find.voice.map(function (v) { return v.title; })
-        }, { voice: 0 });
-      };
-
-      this.draw = function (items) {
-        if (!items || !items.length) return this.empty();
-
-        scroll.clear();
-        items.forEach(function (element) {
-          var html = Lampa.Template.get('lampac_prestige_full', {
-            title: 'Эпизод ' + element.number,
-            time: '',
-            info: element.data?.dubbing || '',
-            quality: element.data?.player || ''
-          });
-
-          html.on('hover:enter', function () {
-            Lampa.Player.play({
-              title: (object.movie.title || '') + ' — Эпизод ' + element.number,
-              url: element.iframe_url,
-              method: 'iframe'
-            });
-          });
-
-          scroll.append(html);
-        });
-
-        Lampa.Controller.enable('content');
-      };
-
-      this.filter = function (filter_items) {
-        var select = [];
-        if (filter_items.voice && filter_items.voice.length > 1) {
-          var voiceItems = filter_items.voice.map(function (name, i) {
-            return { title: name, index: i };
-          });
-          select.push({
-            title: 'Озвучка',
-            subtitle: filter_items.voice[0],
-            items: voiceItems,
-            stype: 'voice'
-          });
-        }
-        select.push({ title: 'Сбросить', reset: true });
-        filter.set('filter', select);
-      };
-
-      this.empty = function () {
-        scroll.clear();
-        scroll.append($('<div class="online-empty"><div class="online-empty__title">Yani.TV</div><div class="online-empty__time">Аниме не найдено</div></div>'));
-        this.loading(false);
-      };
-
-      this.loading = function (status) {
-        if (!this.activity) this.activity = Lampa.Activity;
-        if (status) this.activity.loader(true);
-        else {
-          this.activity.loader(false);
-          this.activity.toggle();
-        }
-      };
-
-      this.reset = function () {
-        network.clear();
-        scroll.clear();
-      };
-
-      this.start = function () {
-        files.appendFiles(scroll.render());
-        files.appendHead(filter.render());
-        scroll.body().addClass('torrent-list');
-        Lampa.Controller.add('content', {
-          toggle: function () {
-            Lampa.Controller.collectionSet(scroll.render(), files.render());
-          },
-          back: function () {
-            Lampa.Activity.backward();
-          }
-        });
-        this.initialize();
-      };
-
-      this.render = function () {
-        return files.render();
-      };
-
-      this.destroy = function () {
-        network.clear();
-        files.destroy();
-        scroll.destroy();
-      };
-    }
-    var manifst = {
-      type: 'video',
-      version: '',
-      name: Defined.title,
-      description: '123',
-      component: Defined.component,
-      onContextMenu: function onContextMenu(object) {
-        return {
-          name: Lampa.Lang.translate('lampac_watch'),
-          description: '123'
-        };
-      },
-      onContextLauch: function onContextLauch(object) {
-        resetTemplates();
-        Lampa.Component.add(Defined.component, component);
-		
-		var id = Lampa.Utils.hash(object.number_of_seasons ? object.original_name : object.original_title);
-		var all = Lampa.Storage.get('clarification_search','{}');
-		
-        Lampa.Activity.push({
-          url: '',
-          title: Lampa.Lang.translate('title_online'),
-          component: Defined.component,
-          search: all[id] ? all[id] : object.title,
-          search_one: object.title,
-          search_two: object.original_title,
-          movie: object,
-          page: 1,
-		  clarification: all[id] ? true : false
-        });
-      }
+            this.emptyForQuery(select_title);
+        }.bind(this), function () {
+            this.emptyForQuery(select_title);
+        }.bind(this));
     };
-	
-	
-    Lampa.Manifest.plugins = manifst;
 
-    // === РЕГИСТРАЦИЯ ПЛАГИНА ===
-    // Lampa.Manifest.plugins = {
-    //   type: 'video',
-    //   name: Defined.title,
-    //   component: Defined.component,
-    //   onContextMenu: function () {
-    //     return { name: 'Смотреть на Yani.TV' };
-    //   },
-    //   onContextLauch: function (movie) {
-    //     Lampa.Component.add(Defined.component, Component);
-    //     Lampa.Activity.push({
-    //       component: Defined.component,
-    //       movie: movie,
-    //       search: movie.title,
-    //       title: Defined.title
-    //     });
-    //   }
-    // };
+    function fetchFullInfo(media) {
+        var params = 'token=' + KODIK_TOKEN + '&limit=100&with_episodes=true';
+        if (media.shikimori_id) params += '&shikimori_id=' + media.shikimori_id;
+        else if (media.worldart_link) params += '&worldart_link=' + encodeURIComponent(media.worldart_link);
+        else if (media.kinopoisk_id) params += '&kinopoisk_id=' + media.kinopoisk_id;
+        else if (media.imdb_id) params += '&imdb_id=' + encodeURIComponent(media.imdb_id);
+        else if (media.id) params += '&id=' + media.id;
+        else return component.emptyForQuery(select_title);
 
-    // === ШАБЛОНЫ ===
-    if (!$('#yani-tv-css').length) {
-      $('body').append('<style id="yani-tv-css">@charset "UTF-8";.online-prestige{position:relative;-webkit-border-radius:.3em;border-radius:.3em;background-color:rgba(0,0,0,0.3);display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex}.online-prestige__body{padding:1.2em;line-height:1.3;-webkit-box-flex:1;-webkit-flex-grow:1;-moz-box-flex:1;-ms-flex-positive:1;flex-grow:1;position:relative}@media screen and (max-width:480px){.online-prestige__body{padding:.8em 1.2em}}.online-prestige__head,.online-prestige__footer{display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex;-webkit-box-pack:justify;-webkit-justify-content:space-between;-moz-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between;-webkit-box-align:center;-webkit-align-items:center;-moz-box-align:center;-ms-flex-align:center;align-items:center}.online-prestige__title{font-size:1.7em;overflow:hidden;-o-text-overflow:ellipsis;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;line-clamp:1;-webkit-box-orient:vertical}@media screen and (max-width:480px){.online-prestige__title{font-size:1.4em}}.online-prestige__info{display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex;-webkit-box-align:center;-webkit-align-items:center;-moz-box-align:center;-ms-flex-align:center;align-items:center}.online-prestige__quality{padding-left:1em;white-space:nowrap}.online-empty{line-height:1.4}.online-empty__title{font-size:1.8em;margin-bottom:.3em}.online-empty__time{font-size:1.2em;font-weight:300}</style>');
+        network.timeout(10000);
+        network.native('https://kodikapi.com/search?' + params, function (json) {
+            if (json && json.results) {
+                extractData(json.results);
+                applyFilter();
+                this.loading(false);
+            } else {
+                this.emptyForQuery(select_title);
+            }
+        }.bind(this), function () {
+            this.emptyForQuery(select_title);
+        }.bind(this));
     }
 
-    Lampa.Template.add('lampac_prestige_full', `
-      <div class="online-prestige online-prestige--full selector">
-        <div class="online-prestige__body">
-          <div class="online-prestige__head">
-            <div class="online-prestige__title">{title}</div>
-            <div class="online-prestige__time">{time}</div>
-          </div>
-          <div class="online-prestige__footer">
-            <div class="online-prestige__info">{info}</div>
-            <div class="online-prestige__quality">{quality}</div>
-          </div>
-        </div>
-      </div>
-    `);
-  }
+    function extractData(items) {
+        var seasons = [];
+        items.forEach(function (c) {
+            if (c.seasons) {
+                for (var season_id in c.seasons) {
+                    if (!seasons.some(s => s.id === season_id)) {
+                        seasons.push({
+                            id: season_id,
+                            title: Lampa.Lang.translate('torrent_serial_season') + ' ' + season_id
+                        });
+                    }
+                }
+            }
+        });
+        seasons.sort((a, b) => a.id - b.id);
+        extract = { items: items, seasons: seasons };
+    }
 
-  // === ОТЛОЖЕННАЯ ИНИЦИАЛИЗАЦИЯ ===
-  if (typeof Lampa !== 'undefined' && Lampa.Manifest) {
-    initYaniPlugin();
-  } else {
-    var check = setInterval(function () {
-      if (typeof Lampa !== 'undefined' && Lampa.Manifest) {
-        clearInterval(check);
-        initYaniPlugin();
-      }
-    }, 100);
-  }
+    function applyFilter() {
+        // Обновляем фильтры
+        var filter_items = {
+            season: extract.seasons.map(s => s.title),
+            voice: []
+        };
+
+        if (extract.seasons.length) {
+            var season_id = extract.seasons[choice.season]?.id;
+            extract.items.forEach(c => {
+                if (c.seasons?.[season_id] && c.translation) {
+                    if (!filter_items.voice.some(v => v.id === c.translation.id)) {
+                        filter_items.voice.push({
+                            id: c.translation.id,
+                            title: c.translation.title
+                        });
+                    }
+                }
+            });
+        }
+
+        if (choice.season >= filter_items.season.length) choice.season = 0;
+        if (choice.voice >= filter_items.voice.length) choice.voice = 0;
+
+        // Обновляем UI фильтров
+        var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
+        if (filter_items.season.length > 1) {
+            select.push({
+                title: Lampa.Lang.translate('torrent_serial_season'),
+                subtitle: filter_items.season[choice.season],
+                items: filter_items.season.map((t, i) => ({ title: t, selected: i === choice.season, index: i })),
+                stype: 'season'
+            });
+        }
+        if (filter_items.voice.length) {
+            select.push({
+                title: Lampa.Lang.translate('torrent_parser_voice'),
+                subtitle: filter_items.voice[choice.voice]?.title || '',
+                items: filter_items.voice.map((v, i) => ({ title: v.title, selected: i === choice.voice, index: i })),
+                stype: 'voice'
+            });
+        }
+        filter.set('filter', select);
+        renderItems(filtredItems(filter_items));
+    }
+
+    function filtredItems(filter_items) {
+        var items = [];
+        if (extract.seasons.length) {
+            var season_id = extract.seasons[choice.season]?.id;
+            var voice = filter_items.voice[choice.voice];
+            if (voice) {
+                var translation = extract.items.find(c =>
+                    c.seasons?.[season_id] && c.translation?.id === voice.id
+                );
+                if (translation && translation.seasons?.[season_id]?.episodes) {
+                    var episodes = translation.seasons[season_id].episodes;
+                    for (var ep in episodes) {
+                        items.push({
+                            title: component.formatEpisodeTitle(season_id, ep),
+                            quality: translation.quality || '360p ~ 1080p',
+                            info: ' / ' + voice.title,
+                            season: '' + season_id,
+                            episode: parseInt(ep),
+                            link: episodes[ep]
+                        });
+                    }
+                }
+            }
+        } else {
+            extract.items.forEach(c => {
+                if (!c.seasons) {
+                    items.push({
+                        title: c.translation?.title || select_title,
+                        quality: c.quality || '360p ~ 1080p',
+                        info: '',
+                        link: c.link
+                    });
+                }
+            });
+        }
+        return items;
+    }
+
+    function renderItems(items) {
+        scroll.clear();
+        items.forEach(el => {
+            var hash = Lampa.Utils.hash(
+                el.season ? [el.season, el.episode, object.movie.original_title].join('') : object.movie.original_title
+            );
+            var view = Lampa.Timeline.view(hash);
+            var item = Lampa.Template.get('online_mod', el);
+            item.append(Lampa.Timeline.render(view));
+
+            item.on('hover:enter', function () {
+                getStream(el, function (streamUrl) {
+                    if (streamUrl) {
+                        Lampa.Player.play({ url: streamUrl, title: el.title, timeline: view });
+                    } else {
+                        Lampa.Noty.show(Lampa.Lang.translate('online_mod_nolink'));
+                    }
+                });
+            });
+            scroll.append(item);
+        });
+    }
+
+    function getStream(element, callback) {
+        if (!element.link) return callback('');
+        var url = element.link.replace(/^\/\//, 'https://');
+
+        network.timeout(10000);
+        network.native(url, function (html) {
+            var match = html.match(/\burlParams = '([^']+)'/);
+            if (!match) return callback('');
+
+            try {
+                var params = JSON.parse(match[1]);
+                var videoMatch = html.match(/videoInfo\.(type|hash|id) = '([^']+)'/g);
+                if (!videoMatch || videoMatch.length < 3) return callback('');
+
+                var type = '', hash = '', id = '';
+                videoMatch.forEach(m => {
+                    var parts = m.split(" = '");
+                    if (parts[0].includes('type')) type = parts[1].slice(0, -1);
+                    if (parts[0].includes('hash')) hash = parts[1].slice(0, -1);
+                    if (parts[0].includes('id')) id = parts[1].slice(0, -1);
+                });
+
+                // Получаем ссылку на плеер
+                var playerMatch = html.match(/<script[^>]*src="([^"]*app\.player_single[^"]*)"/);
+                if (!playerMatch) return callback('');
+
+                var playerUrl = url.split('/').slice(0, 3).join('/') + playerMatch[1];
+                network.timeout(10000);
+                network.native(playerUrl, function (playerJs) {
+                    var infoMatch = playerJs.match(/url:\s*atob\("([^"]+)"\)/);
+                    if (!infoMatch) return callback('');
+
+                    try {
+                        var apiUrl = atob(infoMatch[1]);
+                        var postdata = 'd=' + params.d + '&d_sign=' + params.d_sign +
+                            '&pd=' + params.pd + '&pd_sign=' + params.pd_sign +
+                            '&ref=' + params.ref + '&ref_sign=' + params.ref_sign +
+                            '&bad_user=true&cdn_is_working=true' +
+                            '&type=' + type + '&hash=' + hash + '&id=' + id + '&info=%7B%7D';
+
+                        network.timeout(10000);
+                        network.native(url.split('/').slice(0, 3).join('/') + apiUrl, function (resp) {
+                            if (resp.links) {
+                                var qualities = Object.keys(resp.links).sort((a, b) => parseInt(b) - parseInt(a));
+                                if (qualities.length) {
+                                    var src = resp.links[qualities[0]][0]?.src;
+                                    if (src) {
+                                        // Декодируем ссылку (Kodik шифрует base64 + rot13)
+                                        try {
+                                            src = atob(src.replace(/[a-zA-Z]/g, x =>
+                                                String.fromCharCode((x <= 'Z' ? 90 : 122) >= (x = x.charCodeAt(0) + 13) ? x : x - 26)
+                                            ));
+                                        } catch (e) {}
+                                        callback(src);
+                                        return;
+                                    }
+                                }
+                            }
+                            callback('');
+                        }, function () { callback(''); });
+                    } catch (e) { callback(''); }
+                }, function () { callback(''); });
+            } catch (e) { callback(''); }
+        }, function () { callback(''); }, false, { dataType: 'text' });
+    }
+
+    this.loading = function (status) {
+        if (status) this.activity.loader(true);
+        else this.activity.loader(false);
+    };
+
+    this.emptyForQuery = function (query) {
+        var empty = Lampa.Template.get('list_empty');
+        empty.find('.empty__descr').text(
+            Lampa.Lang.translate('online_mod_query_start') + ' (' + query + ') ' + Lampa.Lang.translate('online_mod_query_end')
+        );
+        scroll.append(empty);
+        this.loading(false);
+    };
+
+    this.render = function () { return files.render(); };
+    this.destroy = function () { network.clear(); scroll.destroy(); files.destroy(); };
+
+    // Утилиты
+    this.formatEpisodeTitle = function (s, e) {
+        return (s ? 'S' + s + ' / ' : '') + (Lampa.Lang.translate('torrent_serial_episode') + ' ' + e);
+    };
+}
+
+// === ЛОКАЛИЗАЦИЯ ===
+Lampa.Lang.add({
+    online_mod_query_start: { ru: 'По запросу', en: 'On request' },
+    online_mod_query_end: { ru: 'нет результатов', en: 'no results' },
+    online_mod_nolink: { ru: 'Не удалось извлечь ссылку', en: 'Failed to fetch link' },
+    torrent_serial_season: { ru: 'Сезон', en: 'Season' },
+    torrent_serial_episode: { ru: 'Эпизод', en: 'Episode' },
+    torrent_parser_voice: { ru: 'Озвучка', en: 'Voice' },
+    torrent_parser_reset: { ru: 'Сбросить', en: 'Reset' }
+});
+
+// === ШАБЛОНЫ ===
+Lampa.Template.add('online_mod', `
+<div class="online selector">
+  <div class="online__body">
+    <div style="position:absolute;left:0;top:-0.3em;width:2.4em;height:2.4em">
+      <svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="64" cy="64" r="56" stroke="white" stroke-width="16"/>
+        <path d="M90.5 64.3827L50 87.7654L50 41L90.5 64.3827Z" fill="white"/>
+      </svg>
+    </div>
+    <div class="online__title" style="padding-left:2.1em;">{title}</div>
+    <div class="online__quality" style="padding-left:3.4em;">{quality}{info}</div>
+  </div>
+</div>`);
+
+// === РЕГИСТРАЦИЯ КОМПОНЕНТА ===
+Lampa.Component.add('kodik_only', component);
+
+// === МАНИФЕСТ ПЛАГИНА ===
+Lampa.Manifest.plugins = {
+    type: 'video',
+    version: '1.0',
+    name: 'Kodik Only',
+    description: 'Прямой поиск через Kodik API',
+    component: 'kodik_only',
+    onContextMenu: function (obj) {
+        return { name: 'Смотреть на Kodik', description: '' };
+    },
+    onContextLauch: function (obj) {
+        Lampa.Activity.push({
+            url: '',
+            title: 'Kodik',
+            component: 'kodik_only',
+            movie: obj,
+            search: obj.title,
+            page: 1
+        });
+    }
+};
+
+// === КНОПКА НА СТРАНИЦЕ ФИЛЬМА ===
+Lampa.Listener.follow('full', function (e) {
+    if (e.type === 'complite') {
+        var btn = $(`<div class="full-start__button selector" data-subtitle="Kodik Only">
+            <svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="64" cy="64" r="56" stroke="white" stroke-width="16"/>
+                <path d="M90.5 64.3827L50 87.7654L50 41L90.5 64.3827Z" fill="white"/>
+            </svg>
+            <span>Kodik</span>
+        </div>`);
+        btn.on('hover:enter', function () {
+            Lampa.Activity.push({
+                url: '',
+                title: 'Kodik',
+                component: 'kodik_only',
+                movie: e.data.movie,
+                search: e.data.movie.title,
+                page: 1
+            });
+        });
+        e.object.activity.render().find('.view--torrent').after(btn);
+    }
+});
+
 })();
