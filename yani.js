@@ -2,7 +2,8 @@
 'use strict';
 
 // === ТОКЕН ДЛЯ KODIK API (публичный) ===
-var KODIK_TOKEN = '43617d59b45e8c5a6f2d9c1e8a3b7f0c';
+    //FIXME временно
+var KODIK_TOKEN = '41dd95f84c21719b09d6c71182237a25';
 
 function component(object) {
     var network = new Lampa.Reguest();
