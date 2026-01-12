@@ -224,30 +224,57 @@ function component(object) {
     // === COLLAPS ===
 
     this.searchCollaps = function (kp_id, imdb_id) {
-        var api = (kp_id ? 'kp/' : 'imdb/') + (kp_id || imdb_id);
-        var prox = '';
-        var base = 'api.namy.ws';
-        var host = 'https://' + base;
-        var ref = host + '/';
-        var user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
-        var embed = (false ? 'http:' : 'https:') + '//' + base + '/embed/';
-        var headers = Lampa.Platform.is('android') ? {
-            'User-Agent': user_agent,
-            'Origin': host,
-            'Referer': ref
-        } : {};
+    var api = (kp_id ? 'kp/' : 'imdb/') + (kp_id || imdb_id);
+    var base1 = 'api.namy.ws';
+    var base2 = 'api.kinogram.best';
+    var host1 = 'https://' + base1;
+    var host2 = 'https://' + base2;
+    var ref1 = host1 + '/';
+    var ref2 = host2 + '/';
+    var user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
+    var embed1 = 'https://' + base1 + '/embed/';
+    var embed2 = 'https://' + base2 + '/embed/';
+    var headers1 = Lampa.Platform.is('android') ? {
+        'User-Agent': user_agent,
+        'Origin': host1,
+        'Referer': ref1
+    } : {};
+    var headers2 = Lampa.Platform.is('android') ? {
+        'User-Agent': user_agent,
+        'Origin': host2,
+        'Referer': ref2
+    } : {};
 
-        network.timeout(10000);
-        network.native(embed + api, function (str) {
-            self.parseCollaps(str || '');
-        }, function () {
-            if (!object.clarification && object.movie.imdb_id && kp_id != object.movie.imdb_id) {
-                self.searchCollaps(0, object.movie.imdb_id);
-            } else {
-                self.emptyForQuery(select_title);
-            }
-        }, false, { dataType: 'text', headers: headers });
-    };
+    // Первый запрос — к основному домену
+    network.timeout(10000);
+    network.native(embed1 + api, function (str) {
+        self.parseCollaps(str || '');
+    }, function (a, c) {
+        // Если 404 или 422 — пробуем резервный домен
+        if ((a.status === 404 || a.status === 422) && (!a.responseText || a.responseText.indexOf('видео недоступно') !== -1)) {
+            // Пробуем второй домен
+            network.timeout(10000);
+            network.native(embed2 + api, function (str) {
+                self.parseCollaps(str || '');
+            }, function (a2, c2) {
+                // Если и второй не сработал — ошибка
+                if ((a2.status === 404 || a2.status === 422) && (!a2.responseText || a2.responseText.indexOf('видео недоступно') !== -1)) {
+                    if (!object.clarification && object.movie.imdb_id && kp_id != object.movie.imdb_id) {
+                        self.searchCollaps(0, object.movie.imdb_id);
+                    } else {
+                        self.emptyForQuery(select_title);
+                    }
+                } else {
+                    // Другая ошибка — тоже показываем пустой результат
+                    self.emptyForQuery(select_title);
+                }
+            }, false, { dataType: 'text', headers: headers2 });
+        } else {
+            // Не 404/422 — обычная ошибка
+            self.emptyForQuery(select_title);
+        }
+    }, false, { dataType: 'text', headers: headers1 });
+};
 
     this.parseCollaps = function (str) {
         str = (str || '').replace(/\n/g, '');
