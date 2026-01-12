@@ -17,6 +17,8 @@ function component(object) {
     var initialized = false;
     var self = this;
 
+    var choice = { season: 0, voice: 0 };
+
     // === МЕТОДЫ ЖИЗНЕННОГО ЦИКЛА ===
 
     this.create = function () {
@@ -27,12 +29,22 @@ function component(object) {
         filter.onBack = function () { Lampa.Activity.backward(); };
         filter.onSelect = function (type, a, b) {
             if (a.reset) {
-                self.reset();
+                choice = { season: 0, voice: 0 };
+                self.applyFilter(current_balancer);
+                self.renderItems(current_balancer, current_balancer === 'kodik' ? self.filtredKodik() : self.filtredCollaps());
             } else if (a.stype === 'source') {
                 current_balancer = ['kodik', 'collaps'][b.index];
                 Lampa.Storage.set('kodik_collaps_balancer', current_balancer);
                 self.reset();
                 self.search();
+            } else if (a.stype === 'season') {
+                choice.season = b.index;
+                self.applyFilter(current_balancer);
+                self.renderItems(current_balancer, current_balancer === 'kodik' ? self.filtredKodik() : self.filtredCollaps());
+            } else if (a.stype === 'voice') {
+                choice.voice = b.index;
+                self.applyFilter(current_balancer);
+                self.renderItems(current_balancer, current_balancer === 'kodik' ? self.filtredKodik() : self.filtredCollaps());
             }
         };
 
@@ -425,7 +437,7 @@ function component(object) {
 
     var lastItem = null;
     var filter_items = {};
-    var choice = { season: 0, voice: 0 };
+    // var choice = { season: 0, voice: 0 };
 
     this.renderItems = function (balancer, items) {
         scroll.clear();
