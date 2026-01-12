@@ -194,25 +194,60 @@
         scroll.destroy();
       };
     }
-
-    // === РЕГИСТРАЦИЯ ПЛАГИНА ===
-    Lampa.Manifest.plugins = {
+    var manifst = {
       type: 'video',
+      version: '',
       name: Defined.title,
+      description: '123',
       component: Defined.component,
-      onContextMenu: function () {
-        return { name: 'Смотреть на Yani.TV' };
+      onContextMenu: function onContextMenu(object) {
+        return {
+          name: Lampa.Lang.translate('lampac_watch'),
+          description: '123'
+        };
       },
-      onContextLauch: function (movie) {
-        Lampa.Component.add(Defined.component, Component);
+      onContextLauch: function onContextLauch(object) {
+        resetTemplates();
+        Lampa.Component.add(Defined.component, component);
+		
+		var id = Lampa.Utils.hash(object.number_of_seasons ? object.original_name : object.original_title);
+		var all = Lampa.Storage.get('clarification_search','{}');
+		
         Lampa.Activity.push({
+          url: '',
+          title: Lampa.Lang.translate('title_online'),
           component: Defined.component,
-          movie: movie,
-          search: movie.title,
-          title: Defined.title
+          search: all[id] ? all[id] : object.title,
+          search_one: object.title,
+          search_two: object.original_title,
+          movie: object,
+          page: 1,
+		  clarification: all[id] ? true : false
         });
       }
     };
+	
+	
+    Lampa.Manifest.plugins = manifst;
+
+    // === РЕГИСТРАЦИЯ ПЛАГИНА ===
+    // Lampa.Manifest.plugins = {
+    //   type: 'video',
+    //   name: Defined.title,
+    //   component: Defined.component,
+    //   onContextMenu: function () {
+    //     return { name: 'Смотреть на Yani.TV' };
+    //   },
+    //   onContextLauch: function (movie) {
+    //     Lampa.Component.add(Defined.component, Component);
+    //     Lampa.Activity.push({
+    //       component: Defined.component,
+    //       movie: movie,
+    //       search: movie.title,
+    //       title: Defined.title
+    //     });
+    //   }
+    // };
 
     // === ШАБЛОНЫ ===
     if (!$('#yani-tv-css').length) {
