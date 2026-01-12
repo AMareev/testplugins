@@ -35,7 +35,7 @@ function component(object) {
             }
         };
 
-        this.search();
+        self.search();
         return this.render();
     };
 
@@ -43,8 +43,8 @@ function component(object) {
         if (Lampa.Activity.active().activity !== this.activity) return;
         if (!initialized) {
             initialized = true;
-            this.loading(true);
-            this.search();
+            self.loading(true);
+            self.search();
         }
 
         Lampa.Background.immediately(Lampa.Utils.cardImgBackground(object.movie));
@@ -91,7 +91,7 @@ function component(object) {
     // === ОСНОВНАЯ ЛОГИКА ===
 
     this.search = function () {
-        this.loading(true);
+        self.loading(true);
         select_title = object.search || object.movie.title;
         var kp_id = object.movie.kinopoisk_id ? parseInt(object.movie.kinopoisk_id) : 0;
         var imdb_id = object.movie.imdb_id || '';
@@ -116,9 +116,9 @@ function component(object) {
                     return;
                 }
             }
-            this.emptyForQuery(select_title);
+            self.emptyForQuery(select_title);
         }.bind(this), function () {
-            this.emptyForQuery(select_title);
+            self.emptyForQuery(select_title);
         }.bind(this));
     };
 
@@ -136,12 +136,12 @@ function component(object) {
             if (json && json.results) {
                 extractData(json.results);
                 applyFilter();
-                this.loading(false);
+                self.loading(false);
             } else {
-                this.emptyForQuery(select_title);
+                self.emptyForQuery(select_title);
             }
         }.bind(this), function () {
-            this.emptyForQuery(select_title);
+            self.emptyForQuery(select_title);
         }.bind(this));
     }
 
@@ -347,7 +347,7 @@ function component(object) {
             Lampa.Lang.translate('online_mod_query_start') + ' (' + query + ') ' + Lampa.Lang.translate('online_mod_query_end')
         );
         scroll.append(empty);
-        this.loading(false);
+        self.loading(false);
     };
 
     this.formatEpisodeTitle = function (s, e) {
