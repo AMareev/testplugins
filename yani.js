@@ -6,6 +6,7 @@
 var KODIK_TOKEN = '41dd95f84c21719b09d6c71182237a25';
 
 function component(object) {
+    var self = this;
     var network = new Lampa.Reguest();
     var scroll = new Lampa.Scroll({ mask: true, over: true });
     var files = new Lampa.Explorer(object);
@@ -219,7 +220,7 @@ function component(object) {
                     var episodes = translation.seasons[season_id].episodes;
                     for (var ep in episodes) {
                         items.push({
-                            title: component.formatEpisodeTitle(season_id, ep),
+                            title: self.formatEpisodeTitle(season_id, ep),
                             quality: translation.quality || '360p ~ 1080p',
                             info: ' / ' + voice.title,
                             season: '' + season_id,
@@ -351,7 +352,7 @@ function component(object) {
 
     this.formatEpisodeTitle = function (s, e) {
         return (s ? 'S' + s + ' / ' : '') + (Lampa.Lang.translate('torrent_serial_episode') + ' ' + e);
-    };
+};
 }
 
 // === ЛОКАЛИЗАЦИЯ ===
