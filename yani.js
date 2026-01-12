@@ -1,8 +1,8 @@
 (function () {
 'use strict';
 
-// === ТОКЕН ДЛЯ KODIK API (публичный, не секретный) ===
-var KODIK_TOKEN = '43617d59b45e8c5a6f2d9c1e8a3b7f0c'; // пример; замените на актуальный, если нужно
+// === ТОКЕН ДЛЯ KODIK API (публичный) ===
+var KODIK_TOKEN = '43617d59b45e8c5a6f2d9c1e8a3b7f0c';
 
 function component(object) {
     var network = new Lampa.Reguest();
@@ -13,6 +13,9 @@ function component(object) {
     var select_title = '';
     var extract = { items: [], seasons: [] };
     var choice = { season: 0, voice: 0 };
+    var initialized = false;
+
+    // === МЕТОДЫ ЖИЗНЕННОГО ЦИКЛА ===
 
     this.create = function () {
         scroll.body().addClass('torrent-list');
@@ -34,13 +37,63 @@ function component(object) {
         return this.render();
     };
 
+    this.start = function () {
+        if (Lampa.Activity.active().activity !== this.activity) return;
+        if (!initialized) {
+            initialized = true;
+            this.loading(true);
+            this.search();
+        }
+
+        Lampa.Background.immediately(Lampa.Utils.cardImgBackground(object.movie));
+
+        Lampa.Controller.add('content', {
+            toggle: function () {
+                Lampa.Controller.collectionSet(scroll.render(), files.render());
+                Lampa.Controller.collectionFocus(lastItem || false, scroll.render());
+            },
+            back: function () { Lampa.Activity.backward(); },
+            up: function () { Navigator.move('up'); },
+            down: function () { Navigator.move('down'); },
+            right: function () {
+                if (Navigator.canmove('right')) Navigator.move('right');
+                else filter.show(Lampa.Lang.translate('title_filter'), 'filter');
+            },
+            left: function () {
+                if (Navigator.canmove('left')) Navigator.move('left');
+                else Lampa.Controller.toggle('menu');
+            }
+        });
+
+        if (this.inActivity()) {
+            Lampa.Controller.toggle('content');
+        }
+    };
+
+    this.inActivity = function () {
+        var body = $('body');
+        return !(
+            body.hasClass('settings--open') ||
+            body.hasClass('menu--open') ||
+            body.hasClass('keyboard-input--visible') ||
+            body.hasClass('selectbox--open') ||
+            body.hasClass('search--open') ||
+            body.hasClass('ambience--enable') ||
+            $('div.modal').length
+        );
+    };
+
+    this.render = function () { return files.render(); };
+    this.destroy = function () { network.clear(); scroll.destroy(); files.destroy(); };
+
+    // === ОСНОВНАЯ ЛОГИКА ===
+
     this.search = function () {
         this.loading(true);
         select_title = object.search || object.movie.title;
         var kp_id = object.movie.kinopoisk_id ? parseInt(object.movie.kinopoisk_id) : 0;
         var imdb_id = object.movie.imdb_id || '';
 
-        // Формируем запрос к Kodik API
         var params = 'token=' + KODIK_TOKEN + '&limit=100&translation_type=voice';
         if (kp_id) params += '&kinopoisk_id=' + kp_id;
         else if (imdb_id) params += '&imdb_id=' + encodeURIComponent(imdb_id);
@@ -49,15 +102,12 @@ function component(object) {
         network.timeout(10000);
         network.native('https://kodikapi.com/search?' + params, function (json) {
             if (json && json.results && json.results.length) {
-                // Группируем по медиа-ID
                 var mediaMap = {};
                 json.results.forEach(function (item) {
                     var id = item.id || item.kinopoisk_id || item.imdb_id;
                     if (!mediaMap[id]) mediaMap[id] = [];
                     mediaMap[id].push(item);
                 });
-
-                // Берём первое совпадение
                 var firstId = Object.keys(mediaMap)[0];
                 if (firstId) {
                     fetchFullInfo(mediaMap[firstId][0]);
@@ -112,7 +162,6 @@ function component(object) {
     }
 
     function applyFilter() {
-        // Обновляем фильтры
         var filter_items = {
             season: extract.seasons.map(s => s.title),
             voice: []
@@ -135,7 +184,6 @@ function component(object) {
         if (choice.season >= filter_items.season.length) choice.season = 0;
         if (choice.voice >= filter_items.voice.length) choice.voice = 0;
 
-        // Обновляем UI фильтров
         var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
         if (filter_items.season.length > 1) {
             select.push({
@@ -195,11 +243,13 @@ function component(object) {
         return items;
     }
 
+    var lastItem = null;
+
     function renderItems(items) {
         scroll.clear();
         items.forEach(el => {
             var hash = Lampa.Utils.hash(
-                el.season ? [el.season, el.episode, object.movie.original_title].join('') : object.movie.original_title
+                el.season ? [el.season, el.season > 10 ? ':' : '', el.episode, object.movie.original_title].join('') : object.movie.original_title
             );
             var view = Lampa.Timeline.view(hash);
             var item = Lampa.Template.get('online_mod', el);
@@ -214,6 +264,8 @@ function component(object) {
                     }
                 });
             });
+
+            lastItem = item[0];
             scroll.append(item);
         });
     }
@@ -240,7 +292,6 @@ function component(object) {
                     if (parts[0].includes('id')) id = parts[1].slice(0, -1);
                 });
 
-                // Получаем ссылку на плеер
                 var playerMatch = html.match(/<script[^>]*src="([^"]*app\.player_single[^"]*)"/);
                 if (!playerMatch) return callback('');
 
@@ -265,7 +316,6 @@ function component(object) {
                                 if (qualities.length) {
                                     var src = resp.links[qualities[0]][0]?.src;
                                     if (src) {
-                                        // Декодируем ссылку (Kodik шифрует base64 + rot13)
                                         try {
                                             src = atob(src.replace(/[a-zA-Z]/g, x =>
                                                 String.fromCharCode((x <= 'Z' ? 90 : 122) >= (x = x.charCodeAt(0) + 13) ? x : x - 26)
@@ -298,10 +348,6 @@ function component(object) {
         this.loading(false);
     };
 
-    this.render = function () { return files.render(); };
-    this.destroy = function () { network.clear(); scroll.destroy(); files.destroy(); };
-
-    // Утилиты
     this.formatEpisodeTitle = function (s, e) {
         return (s ? 'S' + s + ' / ' : '') + (Lampa.Lang.translate('torrent_serial_episode') + ' ' + e);
     };
