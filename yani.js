@@ -23,7 +23,9 @@ function component(object) {
 
     this.create = function () {
         // 🔑 КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: сохраняем текущую активность
-        this.activity = Lampa.Activity.active();
+        // this.activity = Lampa.Activity.active();
+        console.log('this.activity:', this.activity);
+console.log('has loader:', typeof this.activity.loader);
 
         scroll.body().addClass('torrent-list');
         files.appendHead(filter.render());
@@ -623,9 +625,11 @@ function component(object) {
 
     // === Утилиты ===
     this.loading = function (status) {
-        if (status) this.activity.loader(true);
-        else this.activity.loader(false);
-    };
+        if (status) this.activity.loader(true);else {
+          this.activity.loader(false);
+          if (Lampa.Activity.active().activity === this.activity && this.inActivity()) this.activity.toggle();
+        }
+      };
 
     this.emptyForQuery = function (query) {
         var empty = Lampa.Template.get('list_empty');
