@@ -40,7 +40,7 @@ function component(object) {
                 choice = { season: 0, voice: 0 };
             
                 // Перезапуск поиска внутри текущей активности
-                self.reset();
+                // self.reset();
                 self.search();
             
                 // Закрыть фильтр через таймаут — как в online_mod.js
