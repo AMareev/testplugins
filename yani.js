@@ -35,8 +35,14 @@ function component(object) {
             } else if (a.stype === 'source') {
                 current_balancer = ['kodik', 'collaps'][b.index];
                 Lampa.Storage.set('kodik_collaps_balancer', current_balancer);
+                // Сбрасываем выбор фильтров, но НЕ перезагружаем активность
+                choice = { season: 0, voice: 0 };
                 self.reset();
                 self.search();
+                // Обновляем UI фильтра немедленно
+                setTimeout(function() {
+                    Lampa.Select.close();
+                }, 10);
             } else if (a.stype === 'season') {
                 choice.season = b.index;
                 self.applyFilter(current_balancer);
@@ -379,7 +385,7 @@ function component(object) {
 
     this.applyFilter = function (balancer) {
         filter_items = { season: [], voice: [] };
-        choice = { season: 0, voice: 0 };
+        // choice = { season: 0, voice: 0 };
 
         if (balancer === 'kodik') {
             var data = extract.kodik;
