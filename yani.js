@@ -14,7 +14,6 @@ function component(object) {
     var select_title = '';
     var current_balancer = Lampa.Storage.get('kodik_collaps_balancer', 'kodik'); // kodik или collaps
     var extract = {};
-    var initialized = false;
     var self = this;
     var last_bls = Lampa.Storage.field('kodik_collaps_save_last_balanser') === true ? Lampa.Storage.cache('kodik_collaps_last_balanser', 200, {}) : {};
 
@@ -23,7 +22,9 @@ function component(object) {
     // === МЕТОДЫ ЖИЗНЕННОГО ЦИКЛА ===
 
     this.create = function () {
-        this.activity = Lampa.Activity.current();
+        // 🔑 КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: сохраняем текущую активность
+        this.activity = Lampa.Activity.active();
+
         scroll.body().addClass('torrent-list');
         files.appendHead(filter.render());
         files.appendFiles(scroll.render());
@@ -52,35 +53,32 @@ function component(object) {
     };
 
     this.changeBalanser = function (balanser_name) {
-    current_balancer = balanser_name;
-    Lampa.Storage.set('kodik_collaps_balancer', current_balancer);
-    last_bls[object.movie.id] = balanser_name;
-    if (Lampa.Storage.field('kodik_collaps_save_last_balanser') === true) {
-        Lampa.Storage.set('kodik_collaps_last_balanser', last_bls);
-    }
-
-    // Сброс фильтров и поиск — без смены активности!
-    choice = { season: 0, voice: 0 };
-    this.reset(); // который вызывает loading(true) + search()
-    setTimeout(this.closeFilter, 10);
-};
+        current_balancer = balanser_name;
+        Lampa.Storage.set('kodik_collaps_balancer', current_balancer);
+        last_bls[object.movie.id] = balanser_name;
+        if (Lampa.Storage.field('kodik_collaps_save_last_balanser') === true) {
+            Lampa.Storage.set('kodik_collaps_last_balanser', last_bls);
+        }
+        this.reset(); // ← перезапуск поиска без смены активности
+        setTimeout(this.closeFilter, 10);
+    };
     
     this.closeFilter = function () {
-        
-            if ($('body').hasClass('selectbox--open')) {
-                Lampa.Select.close();
-            }
-        };
+        if ($('body').hasClass('selectbox--open')) {
+            Lampa.Select.close();
+        }
+    };
 
-    this.start = function (first_select) {
+    this.start = function () {
+        // 🔑 Проверка: если активность сменилась — не запускаем UI
         if (Lampa.Activity.active().activity !== this.activity) return;
-    
+
         Lampa.Background.immediately(Lampa.Utils.cardImgBackground(object.movie));
-    
-        // Найдём последний просмотренный элемент для фокуса
+
+        // Найдём последний элемент для фокуса
         var last_views = scroll.render().find('.selector.online').find('.torrent-item__viewed').parent().last();
         var last = last_views.length ? last_views[0] : scroll.render().find('.selector')[0] || false;
-    
+
         Lampa.Controller.add('content', {
             toggle: function () {
                 Lampa.Controller.collectionSet(scroll.render(), files.render());
@@ -98,7 +96,7 @@ function component(object) {
                 else Lampa.Controller.toggle('menu');
             }
         });
-    
+
         if (this.inActivity()) {
             Lampa.Controller.toggle('content');
         }
@@ -136,9 +134,8 @@ function component(object) {
 
     this.reset = function () {
         scroll.clear();
-        choice = { season: 0, voice: 0 };
         this.loading(true);
-        this.search(); // ← правильно: перезапуск поиска, но не UI
+        this.search();
     };
 
     // === KODIK ===
@@ -256,57 +253,51 @@ function component(object) {
     // === COLLAPS ===
 
     this.searchCollaps = function (kp_id, imdb_id) {
-    var api = (kp_id ? 'kp/' : 'imdb/') + (kp_id || imdb_id);
-    var base1 = 'api.namy.ws';
-    var base2 = 'api.kinogram.best';
-    var host1 = 'https://' + base1;
-    var host2 = 'https://' + base2;
-    var ref1 = host1 + '/';
-    var ref2 = host2 + '/';
-    var user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
-    var embed1 = 'https://' + base1 + '/embed/';
-    var embed2 = 'https://' + base2 + '/embed/';
-    var headers1 = Lampa.Platform.is('android') ? {
-        'User-Agent': user_agent,
-        'Origin': host1,
-        'Referer': ref1
-    } : {};
-    var headers2 = Lampa.Platform.is('android') ? {
-        'User-Agent': user_agent,
-        'Origin': host2,
-        'Referer': ref2
-    } : {};
+        var api = (kp_id ? 'kp/' : 'imdb/') + (kp_id || imdb_id);
+        var base1 = 'api.namy.ws';
+        var base2 = 'api.kinogram.best';
+        var host1 = 'https://' + base1;
+        var host2 = 'https://' + base2;
+        var ref1 = host1 + '/';
+        var ref2 = host2 + '/';
+        var user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
+        var embed1 = 'https://' + base1 + '/embed/';
+        var embed2 = 'https://' + base2 + '/embed/';
+        var headers1 = Lampa.Platform.is('android') ? {
+            'User-Agent': user_agent,
+            'Origin': host1,
+            'Referer': ref1
+        } : {};
+        var headers2 = Lampa.Platform.is('android') ? {
+            'User-Agent': user_agent,
+            'Origin': host2,
+            'Referer': ref2
+        } : {};
 
-    // Первый запрос — к основному домену
-    network.timeout(10000);
-    network.native(embed1 + api, function (str) {
-        self.parseCollaps(str || '');
-    }, function (a, c) {
-        // Если 404 или 422 — пробуем резервный домен
-        if ((a.status === 404 || a.status === 422) && (!a.responseText || a.responseText.indexOf('видео недоступно') !== -1)) {
-            // Пробуем второй домен
-            network.timeout(10000);
-            network.native(embed2 + api, function (str) {
-                self.parseCollaps(str || '');
-            }, function (a2, c2) {
-                // Если и второй не сработал — ошибка
-                if ((a2.status === 404 || a2.status === 422) && (!a2.responseText || a2.responseText.indexOf('видео недоступно') !== -1)) {
-                    if (!object.clarification && object.movie.imdb_id && kp_id != object.movie.imdb_id) {
-                        self.searchCollaps(0, object.movie.imdb_id);
+        network.timeout(10000);
+        network.native(embed1 + api, function (str) {
+            self.parseCollaps(str || '');
+        }, function (a, c) {
+            if ((a.status === 404 || a.status === 422) && (!a.responseText || a.responseText.indexOf('видео недоступно') !== -1)) {
+                network.timeout(10000);
+                network.native(embed2 + api, function (str) {
+                    self.parseCollaps(str || '');
+                }, function (a2, c2) {
+                    if ((a2.status === 404 || a2.status === 422) && (!a2.responseText || a2.responseText.indexOf('видео недоступно') !== -1)) {
+                        if (!object.clarification && object.movie.imdb_id && kp_id != object.movie.imdb_id) {
+                            self.searchCollaps(0, object.movie.imdb_id);
+                        } else {
+                            self.emptyForQuery(select_title);
+                        }
                     } else {
                         self.emptyForQuery(select_title);
                     }
-                } else {
-                    // Другая ошибка — тоже показываем пустой результат
-                    self.emptyForQuery(select_title);
-                }
-            }, false, { dataType: 'text', headers: headers2 });
-        } else {
-            // Не 404/422 — обычная ошибка
-            self.emptyForQuery(select_title);
-        }
-    }, false, { dataType: 'text', headers: headers1 });
-};
+                }, false, { dataType: 'text', headers: headers2 });
+            } else {
+                self.emptyForQuery(select_title);
+            }
+        }, false, { dataType: 'text', headers: headers1 });
+    };
 
     this.parseCollaps = function (str) {
         str = (str || '').replace(/\n/g, '');
@@ -399,7 +390,6 @@ function component(object) {
 
     this.applyFilter = function (balancer) {
         filter_items = { season: [], voice: [] };
-        // choice = { season: 0, voice: 0 };
 
         if (balancer === 'kodik') {
             var data = extract.kodik;
@@ -419,7 +409,6 @@ function component(object) {
             if (pl && pl.seasons) {
                 filter_items.season = pl.seasons.map(s => Lampa.Lang.translate('torrent_serial_season') + ' ' + s.season);
             }
-            // Collaps не имеет фильтрации по озвучке в этом UI — пропускаем
         }
 
         var sources = [
@@ -457,7 +446,6 @@ function component(object) {
 
     var lastItem = null;
     var filter_items = {};
-    // var choice = { season: 0, voice: 0 };
 
     this.renderItems = function (balancer, items) {
         scroll.clear();
