@@ -22,37 +22,46 @@ function component(object) {
     // === МЕТОДЫ ЖИЗНЕННОГО ЦИКЛА ===
 
     this.create = function () {
-        // 🔑 КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: сохраняем текущую активность
-        // this.activity = Lampa.Activity.active();
-        console.log('this.activity:', this.activity);
-console.log('has loader:', typeof this.activity.loader);
+        var _this = this;
 
-        scroll.body().addClass('torrent-list');
-        files.appendHead(filter.render());
-        files.appendFiles(scroll.render());
+        this.activity.loader(true);
 
-        filter.onBack = function () { Lampa.Activity.backward(); };
-        filter.onSelect = function (type, a, b) {
-            if (a.reset) {
-                choice = { season: 0, voice: 0 };
-                self.applyFilter(current_balancer);
-                self.renderItems(current_balancer, current_balancer === 'kodik' ? self.filtredKodik() : self.filtredCollaps());
-            } else if (a.stype == 'source') {
-              self.changeBalanser(['kodik', 'collaps'][b.index]);
-            } else if (a.stype === 'season') {
-                choice.season = b.index;
-                self.applyFilter(current_balancer);
-                self.renderItems(current_balancer, current_balancer === 'kodik' ? self.filtredKodik() : self.filtredCollaps());
-            } else if (a.stype === 'voice') {
-                choice.voice = b.index;
-                self.applyFilter(current_balancer);
-                self.renderItems(current_balancer, current_balancer === 'kodik' ? self.filtredKodik() : self.filtredCollaps());
-            }
+        filter.onSearch = function (value) {
+          Lampa.Activity.replace({
+            search: value,
+            search_date: '',
+            clarification: true
+          });
         };
 
+        filter.onBack = function () {
+          _this.start();
+        };
+
+        filter.onSelect = function (type, a, b) {
+          if (type == 'filter') {
+            if (a.reset) {
+              if (extended) sources[balanser].reset();else _this.start();
+            } else if (a.stype == 'source') {
+              _this.changeBalanser(filter_sources[b.index]);
+            } else if (a.stype == 'quality') {
+              forcedQuality = b.title;
+
+              _this.updateQualityFilter();
+            } else {
+              sources[balanser].filter(type, a, b);
+            }
+          } else if (type == 'sort') {
+            _this.changeBalanser(a.source);
+          }
+        };
+
+        filter.render().find('.filter--sort span').text(Lampa.Lang.translate('online_mod_balanser'));
+        files.appendHead(filter.render());
+        files.appendFiles(scroll.render());
         this.search();
         return this.render();
-    };
+      };
 
     this.changeBalanser = function (balanser_name) {
         current_balancer = balanser_name;
