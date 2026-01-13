@@ -57,8 +57,8 @@ function component(object) {
         if (Lampa.Storage.field('kodik_collaps_save_last_balanser') === true) {
             Lampa.Storage.set('kodik_collaps_last_balanser', last_bls);
         }
-        self.search();
-        self.closeFilter();
+        this.search();
+        setTimeout(this.closeFilter, 10);
     };
     
     this.closeFilter = function () {
@@ -498,8 +498,6 @@ function component(object) {
             lastItem = item[0];
         });
     
-        // Обновляем контент через files.update(), а не напрямую
-        files.update(scroll.render());
         self.loading(false);
     };
 
