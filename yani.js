@@ -35,11 +35,15 @@ function component(object) {
             } else if (a.stype === 'source') {
                 current_balancer = ['kodik', 'collaps'][b.index];
                 Lampa.Storage.set('kodik_collaps_balancer', current_balancer);
+            
                 // Сбрасываем выбор фильтров, но НЕ перезагружаем активность
                 choice = { season: 0, voice: 0 };
+                
+                // Перезапускаем поиск внутри текущей активности
                 self.reset();
                 self.search();
-                // Обновляем UI фильтра немедленно
+            
+                // Закрываем меню фильтра через таймаут (как в online_mod.js)
                 setTimeout(function() {
                     Lampa.Select.close();
                 }, 10);
