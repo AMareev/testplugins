@@ -57,11 +57,12 @@ function component(object) {
         if (Lampa.Storage.field('kodik_collaps_save_last_balanser') === true) {
             Lampa.Storage.set('kodik_collaps_last_balanser', last_bls);
         }
-        this.search();
-        setTimeout(this.closeFilter, 10);
+        self.search();
+        self.closeFilter();
     };
     
     this.closeFilter = function () {
+        
             if ($('body').hasClass('selectbox--open')) {
                 Lampa.Select.close();
             }
@@ -458,7 +459,7 @@ function component(object) {
         scroll.clear();
         var viewed = Lampa.Storage.cache('kodik_collaps_view', 5000, []);
         var last_episode = this.getLastEpisode(items);
-
+    
         items.forEach(function (element) {
             if (element.season) {
                 element.translate_episode_end = last_episode;
@@ -479,7 +480,7 @@ function component(object) {
                 if (element.loading) return;
                 if (object.movie.id) Lampa.Favorite.add('history', object.movie, 100);
                 element.loading = true;
-
+    
                 if (balancer === 'kodik') {
                     self.getStreamKodik(element, function (element) {
                         self.playElement(element, items, balancer);
@@ -496,6 +497,9 @@ function component(object) {
             scroll.append(item);
             lastItem = item[0];
         });
+    
+        // Обновляем контент через files.update(), а не напрямую
+        files.update(scroll.render());
         self.loading(false);
     };
 
