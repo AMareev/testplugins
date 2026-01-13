@@ -43,7 +43,7 @@ function component(object) {
             if (a.reset) {
               if (extended) sources[balanser].reset();else _this.start();
             } else if (a.stype == 'source') {
-              _this.changeBalanser(filter_sources[b.index]);
+              _this.changeBalanser(['kodik', 'collaps'][b.index]);
             } else if (a.stype == 'quality') {
               forcedQuality = b.title;
 
