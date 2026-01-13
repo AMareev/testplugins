@@ -57,7 +57,7 @@ function component(object) {
         if (Lampa.Storage.field('kodik_collaps_save_last_balanser') === true) {
             Lampa.Storage.set('kodik_collaps_last_balanser', last_bls);
         }
-        this.search();
+        this.reset(); // ← это вызывает search(), а не start()
         setTimeout(this.closeFilter, 10);
     };
     
@@ -68,20 +68,19 @@ function component(object) {
             }
         };
 
-    this.start = function () {
+    this.start = function (first_select) {
         if (Lampa.Activity.active().activity !== this.activity) return;
-        if (!initialized) {
-            initialized = true;
-            this.loading(true);
-            this.search();
-        }
-
+    
         Lampa.Background.immediately(Lampa.Utils.cardImgBackground(object.movie));
-
+    
+        // Найдём последний просмотренный элемент для фокуса
+        var last_views = scroll.render().find('.selector.online').find('.torrent-item__viewed').parent().last();
+        var last = last_views.length ? last_views[0] : scroll.render().find('.selector')[0] || false;
+    
         Lampa.Controller.add('content', {
             toggle: function () {
                 Lampa.Controller.collectionSet(scroll.render(), files.render());
-                Lampa.Controller.collectionFocus(lastItem || false, scroll.render());
+                Lampa.Controller.collectionFocus(last, scroll.render());
             },
             back: function () { Lampa.Activity.backward(); },
             up: function () { Navigator.move('up'); },
@@ -95,7 +94,7 @@ function component(object) {
                 else Lampa.Controller.toggle('menu');
             }
         });
-
+    
         if (this.inActivity()) {
             Lampa.Controller.toggle('content');
         }
@@ -133,8 +132,9 @@ function component(object) {
 
     this.reset = function () {
         scroll.clear();
+        choice = { season: 0, voice: 0 };
         this.loading(true);
-        this.search();
+        this.search(); // ← правильно: перезапуск поиска, но не UI
     };
 
     // === KODIK ===
