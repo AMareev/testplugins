@@ -16,6 +16,7 @@ function component(object) {
     var extract = {};
     var initialized = false;
     var self = this;
+    // var last_bls = Lampa.Storage.field('online_mod_save_last_balanser') === true ? Lampa.Storage.cache('online_mod_last_balanser', 200, {}) : {};
 
     var choice = { season: 0, voice: 0 };
 
@@ -32,21 +33,8 @@ function component(object) {
                 choice = { season: 0, voice: 0 };
                 self.applyFilter(current_balancer);
                 self.renderItems(current_balancer, current_balancer === 'kodik' ? self.filtredKodik() : self.filtredCollaps());
-            } else if (a.stype === 'source') {
-                current_balancer = ['kodik', 'collaps'][b.index];
-                Lampa.Storage.set('kodik_collaps_balancer', current_balancer);
-            
-                // Сброс выбора фильтров
-                choice = { season: 0, voice: 0 };
-            
-                // Перезапуск поиска внутри текущей активности
-                // self.reset();
-                self.search();
-            
-                // Закрыть фильтр через таймаут — как в online_mod.js
-                setTimeout(function () {
-                    Lampa.Select.close();
-                }, 10);
+            } else if (a.stype == 'source') {
+              self.changeBalanser(['kodik', 'collaps'][b.index]);
             } else if (a.stype === 'season') {
                 choice.season = b.index;
                 self.applyFilter(current_balancer);
@@ -61,6 +49,19 @@ function component(object) {
         this.search();
         return this.render();
     };
+
+    this.changeBalanser = function (balanser_name) {
+        balanser = balanser_name;
+        Lampa.Storage.set('kodik_collaps_balancer', balanser);
+        // last_bls[object.movie.id] = balanser;
+
+        // if (Lampa.Storage.field('online_mod_save_last_balanser') === true) {
+        //   Lampa.Storage.set('online_mod_last_balanser', last_bls);
+        // }
+
+        this.search();
+        setTimeout(this.closeFilter, 10);
+      };
 
     this.start = function () {
         if (Lampa.Activity.active().activity !== this.activity) return;
