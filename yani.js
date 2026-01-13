@@ -23,6 +23,7 @@ function component(object) {
     // === МЕТОДЫ ЖИЗНЕННОГО ЦИКЛА ===
 
     this.create = function () {
+        this.activity = Lampa.Activity.current();
         scroll.body().addClass('torrent-list');
         files.appendHead(filter.render());
         files.appendFiles(scroll.render());
@@ -51,15 +52,18 @@ function component(object) {
     };
 
     this.changeBalanser = function (balanser_name) {
-        current_balancer = balanser_name;
-        Lampa.Storage.set('kodik_collaps_balancer', current_balancer);
-        last_bls[object.movie.id] = balanser_name;
-        if (Lampa.Storage.field('kodik_collaps_save_last_balanser') === true) {
-            Lampa.Storage.set('kodik_collaps_last_balanser', last_bls);
-        }
-        this.reset(); // ← это вызывает search(), а не start()
-        setTimeout(this.closeFilter, 10);
-    };
+    current_balancer = balanser_name;
+    Lampa.Storage.set('kodik_collaps_balancer', current_balancer);
+    last_bls[object.movie.id] = balanser_name;
+    if (Lampa.Storage.field('kodik_collaps_save_last_balanser') === true) {
+        Lampa.Storage.set('kodik_collaps_last_balanser', last_bls);
+    }
+
+    // Сброс фильтров и поиск — без смены активности!
+    choice = { season: 0, voice: 0 };
+    this.reset(); // который вызывает loading(true) + search()
+    setTimeout(this.closeFilter, 10);
+};
     
     this.closeFilter = function () {
         
