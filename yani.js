@@ -60,8 +60,12 @@ function component(object) {
         // }
 
         this.search();
-        setTimeout(this.closeFilter, 10);
+        setTimeout(self.closeFilter, 10);
       };
+    
+    this.closeFilter = function () {
+        Lampa.Select.close();
+    };
 
     this.start = function () {
         if (Lampa.Activity.active().activity !== this.activity) return;
