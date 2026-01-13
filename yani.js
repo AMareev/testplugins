@@ -51,8 +51,8 @@ function component(object) {
     };
 
     this.changeBalanser = function (balanser_name) {
-        balanser = balanser_name;
-        Lampa.Storage.set('kodik_collaps_balancer', balanser);
+        current_balancer = balanser_name;
+        Lampa.Storage.set('kodik_collaps_balancer', current_balancer);
         // last_bls[object.movie.id] = balanser;
 
         // if (Lampa.Storage.field('online_mod_save_last_balanser') === true) {
