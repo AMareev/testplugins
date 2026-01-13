@@ -16,7 +16,7 @@ function component(object) {
     var extract = {};
     var initialized = false;
     var self = this;
-    // var last_bls = Lampa.Storage.field('online_mod_save_last_balanser') === true ? Lampa.Storage.cache('online_mod_last_balanser', 200, {}) : {};
+    var last_bls = Lampa.Storage.field('kodik_collaps_save_last_balanser') === true ? Lampa.Storage.cache('kodik_collaps_last_balanser', 200, {}) : {};
 
     var choice = { season: 0, voice: 0 };
 
@@ -53,19 +53,19 @@ function component(object) {
     this.changeBalanser = function (balanser_name) {
         current_balancer = balanser_name;
         Lampa.Storage.set('kodik_collaps_balancer', current_balancer);
-        // last_bls[object.movie.id] = balanser;
-
-        // if (Lampa.Storage.field('online_mod_save_last_balanser') === true) {
-        //   Lampa.Storage.set('online_mod_last_balanser', last_bls);
-        // }
-
+        last_bls[object.movie.id] = balanser_name;
+        if (Lampa.Storage.field('kodik_collaps_save_last_balanser') === true) {
+            Lampa.Storage.set('kodik_collaps_last_balanser', last_bls);
+        }
         this.search();
-        setTimeout(self.closeFilter, 10);
-      };
+        setTimeout(this.closeFilter, 10);
+    };
     
     this.closeFilter = function () {
-        Lampa.Select.close();
-    };
+            if ($('body').hasClass('selectbox--open')) {
+                Lampa.Select.close();
+            }
+        };
 
     this.start = function () {
         if (Lampa.Activity.active().activity !== this.activity) return;
