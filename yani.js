@@ -137,18 +137,29 @@ function component(object) {
     // === ОСНОВНАЯ ЛОГИКА ===
 
     this.search = function () {
-        select_title = object.search || object.movie.title;
-        var kp_id = object.movie.kinopoisk_id ? parseInt(object.movie.kinopoisk_id) : 0;
-        var imdb_id = object.movie.imdb_id || '';
+    select_title = object.search || object.movie.title;
+    var kp_id = object.movie.kinopoisk_id ? parseInt(object.movie.kinopoisk_id) : 0;
+    var imdb_id = object.movie.imdb_id || '';
 
-        if (current_balancer === 'kodik') {
-            self.searchKodik(kp_id, imdb_id);
-        } else if (current_balancer === 'collaps') {
-            self.searchCollaps(kp_id, imdb_id);
-        } else if (current_balancer === 'yani') {
-            self.searchYani(kp_id); // ← Yani работает только по KP
+    if (current_balancer === 'kodik') {
+        self.searchKodik(kp_id, imdb_id);
+    } else if (current_balancer === 'collaps') {
+        if (kp_id) {
+            self.searchCollaps(kp_id, '');
+        } else if (imdb_id) {
+            self.searchCollaps(0, imdb_id);
+        } else {
+            self.emptyForQuery(select_title);
         }
-    };
+    } else if (current_balancer === 'yani') {
+        if (kp_id) {
+            self.searchYani(kp_id);
+        } else {
+            // Yani не работает без kp_id
+            self.emptyForQuery(select_title + ' (Yani требует ID из КиноПоиска)');
+        }
+    }
+};
 
     this.reset = function () {
         scroll.clear();
