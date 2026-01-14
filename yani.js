@@ -798,11 +798,10 @@ this.prepareYaniFilters = function (animeData) {
     
         network.timeout(10000);
         network.native(proxyLink(fullUrl, prox, prox_enc, 'enc'), function (html) {
-            console.log('[Yani] Получен HTML (первые 500 символов):', html ? html.substring(0, 500) : 'пусто');
+            console.log('[Yani] Получен HTML (первые 300 символов):', html ? html.substring(0, 300) : 'пусто');
     
             // Ищем <video src="...">
-            var videoMatch = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
-            console.log('YANI videoMatch', videoMatch)
+            var videoMatch = html.match(/<video[\s\S]*?\ssrc\s*=\s*["']([^"']+)["']/i);
             if (videoMatch && videoMatch[1]) {
                 var streamUrl = videoMatch[1].trim();
                 if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
@@ -812,16 +811,16 @@ this.prepareYaniFilters = function (animeData) {
                 return;
             }
     
-            // Или .m3u8 напрямую
-            var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
-            if (m3u8Match) {
-                element.stream = m3u8Match[1];
+            // Альтернатива: ищем videoUrl в JS
+            var jsMatch = html.match(/var videoUrl\s*=\s*["']([^"']+)["']/);
+            if (jsMatch && jsMatch[1]) {
+                element.stream = jsMatch[1];
                 element.qualitys = false;
                 call(element);
                 return;
             }
     
-            console.warn('[Yani] Не найден <video src> или .m3u8');
+            console.warn('[Yani] Не найден <video src> или videoUrl');
             error();
         }, function (err) {
             console.error('[Yani] ОШИБКА запроса к iframe через прокси:', err);
