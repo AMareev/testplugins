@@ -731,13 +731,16 @@ this.prepareYaniFilters = function (animeData) {
                     self.playElement(element, items, balancer);
                 } else if (balancer === 'yani') {
                     console.log('ELEMENT!!!', element)
-                    self.getStreamYani(element, function (element) {
+                            element.stream = element.iframe_url.replace(/^\/\//, 'https://');
+                            element.qualitys = false; // или true, если поддерживаете выбор качества
+                            self.playElement(element, items, 'yani');
+                    // self.getStreamYani(element, function (element) {
                         
-                        self.playElement(element, items, balancer);
-                    }, function () {
-                        element.loading = false;
-                        Lampa.Noty.show(Lampa.Lang.translate('online_mod_nolink'));
-                    });
+                    //     self.playElement(element, items, balancer);
+                    // }, function () {
+                    //     element.loading = false;
+                    //     Lampa.Noty.show(Lampa.Lang.translate('online_mod_nolink'));
+                    // });
                 }
             });
             scroll.append(item);
@@ -748,69 +751,82 @@ this.prepareYaniFilters = function (animeData) {
     };
 
     this.playElement = function (element, items, balancer) {
-        element.loading = false;
         var first = {
-            url: balancer === 'kodik' ? self.getDefaultQuality(element.qualitys, element.stream) : element.stream,
-            quality: balancer === 'kodik' ? self.renameQualityMap(element.qualitys) : false,
-            subtitles: element.subtitles || false,
+            url: element.stream,
+            quality: element.quality || '360p ~ 1080p',
+            subtitles: false,
             timeline: element.timeline,
-            title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title)
+            title: element.title + (element.info || '')
         };
-
-        if (element.season && Lampa.Platform.version) {
-            var playlist = [];
-            items.forEach(function (elem) {
-                if (elem == element) {
-                    playlist.push(first);
-                } else {
-                    var cell = {
-                        url: function (call) {
-                            if (balancer === 'kodik') {
-                                self.getStreamKodik(elem, function (elem) {
-                                    cell.url = self.getDefaultQuality(elem.qualitys, elem.stream);
-                                    cell.quality = self.renameQualityMap(elem.qualitys);
-                                    cell.subtitles = elem.subtitles;
-                                    call();
-                                }, function () { cell.url = ''; call(); });
-                            } else if (balancer === 'yani') {
-                                 // Вместо self.getStreamYani, сразу используем iframe_url
-                                    element.loading = false; // Убедитесь, что загрузка завершена
-                                
-                                    var first = {
-                                        url: element.iframe_url, // Используем iframe_url как основную ссылку
-                                        quality: '360p ~ 1080p', // Можно получить из данных, если есть
-                                        subtitles: false, // Настройка субтитров может быть сложнее, зависит от плеера
-                                        timeline: element.timeline,
-                                        title: element.title // Или сформируйте заголовок, как вам нужно
-                                    };
-                                // self.getStreamYani(elem, function (elem) {
-                                //     cell.url = elem.stream;
-                                //     call();
-                                // }, function () { cell.url = ''; call(); });
-                            } else {
-                                cell.url = elem.file;
-                                call();
-                            }
-                        },
-                        timeline: elem.timeline,
-                        title: elem.title
-                    };
-                    playlist.push(cell);
-                }
-            });
-            Lampa.Player.playlist(playlist);
-        } else {
-            Lampa.Player.playlist([first]);
-        }
+    
+        Lampa.Player.playlist([first]);
         Lampa.Player.play(first);
-
-        var viewed = Lampa.Storage.cache('kodik_collaps_view', 5000, []);
-        var hash_file = Lampa.Utils.hash(element.season ? [element.season, element.season > 10 ? ':' : '', element.episode, object.movie.original_title, element.title, balancer].join('') : object.movie.original_title + element.title + balancer);
-        if (viewed.indexOf(hash_file) == -1) {
-            viewed.push(hash_file);
-            Lampa.Storage.set('kodik_collaps_view', viewed);
-        }
     };
+
+    // this.playElement = function (element, items, balancer) {
+    //     element.loading = false;
+    //     var first = {
+    //         url: balancer === 'kodik' ? self.getDefaultQuality(element.qualitys, element.stream) : element.stream,
+    //         quality: balancer === 'kodik' ? self.renameQualityMap(element.qualitys) : false,
+    //         subtitles: element.subtitles || false,
+    //         timeline: element.timeline,
+    //         title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title)
+    //     };
+
+    //     if (element.season && Lampa.Platform.version) {
+    //         var playlist = [];
+    //         items.forEach(function (elem) {
+    //             if (elem == element) {
+    //                 playlist.push(first);
+    //             } else {
+    //                 var cell = {
+    //                     url: function (call) {
+    //                         if (balancer === 'kodik') {
+    //                             self.getStreamKodik(elem, function (elem) {
+    //                                 cell.url = self.getDefaultQuality(elem.qualitys, elem.stream);
+    //                                 cell.quality = self.renameQualityMap(elem.qualitys);
+    //                                 cell.subtitles = elem.subtitles;
+    //                                 call();
+    //                             }, function () { cell.url = ''; call(); });
+    //                         } else if (balancer === 'yani') {
+    //                              // Вместо self.getStreamYani, сразу используем iframe_url
+    //                                 element.loading = false; // Убедитесь, что загрузка завершена
+                                
+    //                                 var first = {
+    //                                     url: element.iframe_url, // Используем iframe_url как основную ссылку
+    //                                     quality: '360p ~ 1080p', // Можно получить из данных, если есть
+    //                                     subtitles: false, // Настройка субтитров может быть сложнее, зависит от плеера
+    //                                     timeline: element.timeline,
+    //                                     title: element.title // Или сформируйте заголовок, как вам нужно
+    //                                 };
+    //                             // self.getStreamYani(elem, function (elem) {
+    //                             //     cell.url = elem.stream;
+    //                             //     call();
+    //                             // }, function () { cell.url = ''; call(); });
+    //                         } else {
+    //                             cell.url = elem.file;
+    //                             call();
+    //                         }
+    //                     },
+    //                     timeline: elem.timeline,
+    //                     title: elem.title
+    //                 };
+    //                 playlist.push(cell);
+    //             }
+    //         });
+    //         Lampa.Player.playlist(playlist);
+    //     } else {
+    //         Lampa.Player.playlist([first]);
+    //     }
+    //     Lampa.Player.play(first);
+
+    //     var viewed = Lampa.Storage.cache('kodik_collaps_view', 5000, []);
+    //     var hash_file = Lampa.Utils.hash(element.season ? [element.season, element.season > 10 ? ':' : '', element.episode, object.movie.original_title, element.title, balancer].join('') : object.movie.original_title + element.title + balancer);
+    //     if (viewed.indexOf(hash_file) == -1) {
+    //         viewed.push(hash_file);
+    //         Lampa.Storage.set('kodik_collaps_view', viewed);
+    //     }
+    // };
 
     // === Yani stream extraction ===
     this.getStreamYani = function (element, call, error) {
