@@ -65,6 +65,10 @@ function component(object) {
       };
 
     this.changeBalanser = function (balanser_name) {
+        // Защита от некорректного значения
+        if (!['kodik', 'collaps', 'yani'].includes(balanser_name)) {
+            balanser_name = 'kodik';
+        }
         current_balancer = balanser_name;
         Lampa.Storage.set('kodik_collaps_balancer', current_balancer);
         last_bls[object.movie.id] = balanser_name;
@@ -566,6 +570,7 @@ function component(object) {
     };
     // yani
     this.searchYani = function (kp_id) {
+        console.log('searchYani called with kp_id:', kp_id);
         if (!kp_id) return self.emptyForQuery(select_title);
     
         var url = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
