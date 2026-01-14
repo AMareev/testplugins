@@ -830,32 +830,43 @@ this.prepareYaniFilters = function (animeData) {
 
     // === Yani stream extraction ===
     this.getStreamYani = function (element, call, error) {
-        if (!element.iframe_url) return error();
+    if (!element.iframe_url) return error();
 
-        network.timeout(10000);
-        network.native(element.iframe_url, function (html) {
-            // Ищем прямую ссылку
-            var videoMatch = html.match(/<video[^>]*src=["']([^"']+)["']/i);
-            if (videoMatch && videoMatch[1]) {
-                element.stream = videoMatch[1];
-                element.qualitys = false;
-                call(element);
-                return;
-            }
+    var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
+    // Используем прокси для обхода CORS
+    var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(fullUrl);
 
-            // Ищем m3u8
-            var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
-            if (m3u8Match) {
-                element.stream = m3u8Match[1];
-                element.qualitys = false;
-                call(element);
-                return;
-            }
+    network.timeout(10000);
+    network.native(proxyUrl, function (html) {
+        // Ищем <video src="...">
+        var videoMatch = html.match(/<video[^>]*src\s*=\s*["']([^"']+)["']/i);
+        if (videoMatch && videoMatch[1]) {
+            var streamUrl = videoMatch[1].trim();
+            // Убираем возможный пробел в конце (как в вашем примере)
+            if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
 
-            // TODO: можно добавить поддержку других плееров (Alloha, SovetRomantica и т.д.)
-            error();
-        }, error, false, { dataType: 'text' });
-    };
+            element.stream = streamUrl;
+            element.qualitys = false;
+            call(element);
+            return;
+        }
+
+        // Если не нашли — попробуем m3u8 (на случай других плееров)
+        var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
+        if (m3u8Match) {
+            element.stream = m3u8Match[1];
+            element.qualitys = false;
+            call(element);
+            return;
+        }
+
+        console.warn('Yani: не найден <video src> или .m3u8 в iframe');
+        error();
+    }, function (err) {
+        console.error('Yani stream fetch error:', err);
+        error();
+    }, false, { dataType: 'text' });
+};
 
     // === Kodik stream extraction ===
     this.getStreamKodik = function (element, call, error) {
