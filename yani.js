@@ -609,7 +609,7 @@ this.prepareYaniFilters = function (animeData) {
 
     // === ОБЩИЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
-    var filter_items = {};
+    // var filter_items = {};
 
     this.applyFilter = function (balancer) {
         filter_items = { season: [], voice: [] };
