@@ -243,13 +243,13 @@ function component(object) {
         var items = [];
         var data = extract.kodik;
         if (data.seasons.length) {
-            var season_id = data.seasons[choice.season]?.id;
+            var season_id = data.seasons[choice.season] && data.seasons[choice.season].id;
             var voice = filter_items.voice[choice.voice];
             if (voice) {
                 var translation = data.items.find(c =>
-                    c.seasons?.[season_id] && c.translation?.id === voice.id
+                    c.seasons && c.seasons.[season_id] && c.translation && c.translation.id === voice.id
                 );
-                if (translation && translation.seasons?.[season_id]?.episodes) {
+                if (translation && translation.seasons && translation.seasons.[season_id] && translation.seasons.[season_id].episodes) {
                     var episodes = translation.seasons[season_id].episodes;
                     for (var ep in episodes) {
                         items.push({
@@ -268,7 +268,7 @@ function component(object) {
             data.items.forEach(c => {
                 if (!c.seasons) {
                     items.push({
-                        title: c.translation?.title || select_title,
+                        title: c.translation && c.translation.title || select_title,
                         quality: c.quality || '360p ~ 1080p',
                         info: '',
                         link: c.link,
@@ -438,9 +438,9 @@ function component(object) {
         network.timeout(10000);
         network.native(url, function (json) {
             console.log('YANY title', json)
-            if (json?.response?.length) {
+            if (json && json.response && json.response.length) {
                 var anime = json.response[0];
-                var found_kp_id = anime.remote_ids?.kp_id;
+                var found_kp_id = anime.remote_ids && anime.remote_ids.kp_id;
                 if (found_kp_id && found_kp_id > 0) {
                     self.fetchYaniByKpId(found_kp_id);
                 } else {
@@ -463,7 +463,7 @@ function component(object) {
 
     network.timeout(10000);
     network.native(animeInfoUrl, function (animeInfoJson) {
-        if (!animeInfoJson?.response?.length) {
+        if (!animeInfoJson || !animeInfoJson.response || !animeInfoJson.response.length) {
             self.emptyForQuery(select_title + ' (Yani: аниме не найдено)');
             return;
         }
@@ -478,7 +478,7 @@ function component(object) {
         var videosUrl = 'https://api.yani.tv/anime/' + anime_id + '/videos';
         network.timeout(10000);
         network.native(videosUrl, function (videosJson) {
-            if (videosJson?.response?.length) {
+            if (videosJson && videosJson.response && videosJson.response.length) {
                 animeData.videos = videosJson.response;
                 extract.yani = animeData;
                 self.prepareYaniFilters(animeData);
@@ -509,18 +509,18 @@ function component(object) {
     var data = extract.yani;
     if (!data || !data.videos || !data.videos.length) return items;
 
-    var selectedVoice = filter_items.voice.length ? filter_items.voice[choice.voice]?.id : null;
-    var selectedPlayer = filter_items.player.length ? filter_items.player[choice.player]?.name : null;
+    var selectedVoice = filter_items.voice.length ? filter_items.voice[choice.voice].id : null;
+    var selectedPlayer = filter_items.player.length ? filter_items.player[choice.player].name : null;
 
     data.videos.forEach(ep => {
         // Применяем фильтры
-        if (selectedVoice && ep.data?.dubbing !== selectedVoice) return;
-        if (selectedPlayer && ep.data?.player !== selectedPlayer) return;
+        if (selectedVoice && ep.data.dubbing !== selectedVoice) return;
+        if (selectedPlayer && ep.data.player !== selectedPlayer) return;
 
         items.push({
             title: Lampa.Lang.translate('torrent_serial_episode') + ' ' + ep.number,
             quality: '360p ~ 1080p',
-            info: ' / ' + (ep.data?.dubbing || '') + (ep.data?.player ? ' (' + ep.data.player + ')' : ''),
+            info: ' / ' + (ep.data.dubbing || '') + (ep.data.player ? ' (' + ep.data.player + ')' : ''),
             season: 1, // Упрощённо
             episode: parseFloat(ep.number) || 0,
             iframe_url: ep.iframe_url,
@@ -545,8 +545,8 @@ this.prepareYaniFilters = function (animeData) {
     var playerMap = {};
 
     animeData.videos.forEach(video => {
-        var dub = video.data?.dubbing || 'default';
-        var player = video.data?.player || 'default';
+        var dub = video.data.dubbing || 'default';
+        var player = video.data.player || 'default';
 
         if (dub && dub !== 'delete') {
             voiceMap[dub] = dub;
@@ -569,13 +569,13 @@ this.prepareYaniFilters = function (animeData) {
     //     if (!data || !data.videos || !data.videos.length) return items;
 
     //     var translatesMap = {};
-    //     data.translates?.forEach(t => {
+    //     data.translates.forEach(t => {
     //         translatesMap[t.value] = t.title;
     //     });
 
     //     var episodesByTranslate = {};
     //     data.videos.forEach(video => {
-    //         var dub = video.data?.dubbing || 'default';
+    //         var dub = video.data.dubbing || 'default';
     //         if (!episodesByTranslate[dub]) episodesByTranslate[dub] = [];
     //         episodesByTranslate[dub].push(video);
     //     });
@@ -596,7 +596,7 @@ this.prepareYaniFilters = function (animeData) {
     //         items.push({
     //             title: Lampa.Lang.translate('torrent_serial_episode') + ' ' + ep.number,
     //             quality: '360p ~ 1080p',
-    //             info: ' / ' + (translatesMap[ep.data?.dubbing] || ep.data?.dubbing || ''),
+    //             info: ' / ' + (translatesMap[ep.data.dubbing] || ep.data.dubbing || ''),
     //             season: data.season || 1,
     //             episode: parseFloat(ep.number) || 0,
     //             iframe_url: ep.iframe_url,
@@ -634,10 +634,10 @@ this.prepareYaniFilters = function (animeData) {
         var data = extract.kodik;
         filter_items.season = data.seasons.map(s => s.title);
         if (filter_items.season.length) {
-            var season_id = data.seasons[choice.season]?.id;
+            var season_id = data.seasons[choice.season].id;
             filter_items.voice = [];
             data.items.forEach(c => {
-                if (c.seasons?.[season_id] && c.translation) {
+                if (c.seasons.[season_id] && c.translation) {
                     if (!filter_items.voice.some(v => v.id === c.translation.id)) {
                         filter_items.voice.push({ id: c.translation.id, title: c.translation.title });
                     }
@@ -674,7 +674,7 @@ this.prepareYaniFilters = function (animeData) {
     if (filter_items.voice.length > 0) {
         select.push({
             title: Lampa.Lang.translate('torrent_parser_voice'),
-            subtitle: filter_items.voice[choice.voice]?.title || '',
+            subtitle: filter_items.voice[choice.voice].title || '',
             items: filter_items.voice.map((v, i) => ({ title: v.title, selected: i === choice.voice, index: i })),
             stype: 'voice'
         });
@@ -683,7 +683,7 @@ this.prepareYaniFilters = function (animeData) {
     if (filter_items.player && filter_items.player.length > 0) {
         select.push({
             title: 'Плеер',
-            subtitle: filter_items.player[choice.player]?.title || '',
+            subtitle: filter_items.player[choice.player].title || '',
             items: filter_items.player.map((p, i) => ({ title: p.title, selected: i === choice.player, index: i })),
             stype: 'player'
         });
@@ -884,7 +884,7 @@ this.prepareYaniFilters = function (animeData) {
                             if (resp.links) {
                                 var qualities = Object.keys(resp.links).sort((a, b) => parseInt(b) - parseInt(a));
                                 if (qualities.length) {
-                                    var src = resp.links[qualities[0]][0]?.src;
+                                    var src = resp.links[qualities[0]][0].src;
                                     if (src) {
                                         try {
                                             src = atob(src.replace(/[a-zA-Z]/g, x =>
