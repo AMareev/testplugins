@@ -731,9 +731,14 @@ this.prepareYaniFilters = function (animeData) {
                     self.playElement(element, items, balancer);
                 } else if (balancer === 'yani') {
                     console.log('ELEMENT!!!', element)
-                            element.stream = element.iframe_url.replace(/^\/\//, 'https://');
-                            element.qualitys = false; // или true, если поддерживаете выбор качества
-                            self.playElement(element, items, 'yani');
+                            // element.stream = element.iframe_url.replace(/^\/\//, 'https://');
+                            // element.qualitys = false; // или true, если поддерживаете выбор качества
+                            // self.playElement(element, items, 'yani');
+                    self.getStreamYani(element, function (updatedElement) {
+        self.playElement(updatedElement, items, 'yani');
+    }, function () {
+        Lampa.Noty.show('Не удалось загрузить видео');
+    });
                     // self.getStreamYani(element, function (element) {
                         
                     //     self.playElement(element, items, balancer);
@@ -790,15 +795,15 @@ this.prepareYaniFilters = function (animeData) {
     //                             }, function () { cell.url = ''; call(); });
     //                         } else if (balancer === 'yani') {
     //                              // Вместо self.getStreamYani, сразу используем iframe_url
-    //                                 element.loading = false; // Убедитесь, что загрузка завершена
+                                    // element.loading = false; // Убедитесь, что загрузка завершена
                                 
-    //                                 var first = {
-    //                                     url: element.iframe_url, // Используем iframe_url как основную ссылку
-    //                                     quality: '360p ~ 1080p', // Можно получить из данных, если есть
-    //                                     subtitles: false, // Настройка субтитров может быть сложнее, зависит от плеера
-    //                                     timeline: element.timeline,
-    //                                     title: element.title // Или сформируйте заголовок, как вам нужно
-    //                                 };
+                                    // var first = {
+                                    //     url: element.iframe_url, // Используем iframe_url как основную ссылку
+                                    //     quality: '360p ~ 1080p', // Можно получить из данных, если есть
+                                    //     subtitles: false, // Настройка субтитров может быть сложнее, зависит от плеера
+                                    //     timeline: element.timeline,
+                                    //     title: element.title // Или сформируйте заголовок, как вам нужно
+                                    // };
     //                             // self.getStreamYani(elem, function (elem) {
     //                             //     cell.url = elem.stream;
     //                             //     call();
@@ -833,40 +838,71 @@ this.prepareYaniFilters = function (animeData) {
     if (!element.iframe_url) return error();
 
     var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
-    // Используем прокси для обхода CORS
     var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(fullUrl);
 
-    network.timeout(10000);
+    console.log('[Yani] Запрос через прокси:', proxyUrl);
+
+    network.timeout(15000);
     network.native(proxyUrl, function (html) {
         // Ищем <video src="...">
-        var videoMatch = html.match(/<video[^>]*src\s*=\s*["']([^"']+)["']/i);
-        if (videoMatch && videoMatch[1]) {
-            var streamUrl = videoMatch[1].trim();
-            // Убираем возможный пробел в конце (как в вашем примере)
-            if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
+        var match = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
+        if (match && match[1]) {
+            var streamUrl = match[1].trim(); // ← trim() уберёт пробелы!
+            console.log('[Yani] Найден видео URL:', streamUrl);
 
-            element.stream = streamUrl;
-            element.qualitys = false;
-            call(element);
-            return;
+            if (streamUrl && (streamUrl.endsWith('.mpd') || streamUrl.endsWith('.m3u8'))) {
+                element.stream = streamUrl;
+                element.qualitys = false;
+                call(element);
+                return;
+            }
         }
 
-        // Если не нашли — попробуем m3u8 (на случай других плееров)
-        var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
-        if (m3u8Match) {
-            element.stream = m3u8Match[1];
-            element.qualitys = false;
-            call(element);
-            return;
-        }
-
-        console.warn('Yani: не найден <video src> или .m3u8 в iframe');
+        console.warn('[Yani] Не удалось найти <video src> в HTML');
         error();
     }, function (err) {
-        console.error('Yani stream fetch error:', err);
+        console.error('[Yani] Ошибка загрузки iframe:', err);
         error();
     }, false, { dataType: 'text' });
 };
+//     this.getStreamYani = function (element, call, error) {
+//     if (!element.iframe_url) return error();
+
+//     var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
+//     // Используем прокси для обхода CORS
+//     var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(fullUrl);
+
+//     network.timeout(10000);
+//     network.native(proxyUrl, function (html) {
+//         // Ищем <video src="...">
+//         var videoMatch = html.match(/<video[^>]*src\s*=\s*["']([^"']+)["']/i);
+//         if (videoMatch && videoMatch[1]) {
+//             var streamUrl = videoMatch[1].trim();
+//             // Убираем возможный пробел в конце (как в вашем примере)
+//             if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
+
+//             element.stream = streamUrl;
+//             element.qualitys = false;
+//             call(element);
+//             return;
+//         }
+
+//         // Если не нашли — попробуем m3u8 (на случай других плееров)
+//         var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
+//         if (m3u8Match) {
+//             element.stream = m3u8Match[1];
+//             element.qualitys = false;
+//             call(element);
+//             return;
+//         }
+
+//         console.warn('Yani: не найден <video src> или .m3u8 в iframe');
+//         error();
+//     }, function (err) {
+//         console.error('Yani stream fetch error:', err);
+//         error();
+//     }, false, { dataType: 'text' });
+// };
 
     // === Kodik stream extraction ===
     this.getStreamKodik = function (element, call, error) {
