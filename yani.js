@@ -767,7 +767,7 @@ this.prepareYaniFilters = function (animeData) {
             });
             scroll.append(item);
         });
-        scroll.refresh();
+        // scroll.refresh();
 
         self.loading(false);
     };
