@@ -46,20 +46,23 @@ function component(object) {
         };
 
         filter.onSelect = function (type, a, b) {
-            if (type == 'filter') {
-                if (a.reset) {
-                    _this.reset();
-                } else if (a.stype == 'source') {
-                    _this.changeBalanser(['kodik', 'collaps', 'yani'][b.index]);
-                } else if (a.stype == 'season') {
-                    choice.season = b.index;
-                    _this.reset();
-                } else if (a.stype == 'voice') {
-                    choice.voice = b.index;
-                    _this.reset();
-                }
-            }
-        };
+    if (type == 'filter') {
+        if (a.reset) {
+            _this.reset();
+        } else if (a.stype == 'source') {
+            _this.changeBalanser(['kodik', 'collaps', 'yani'][b.index]);
+        } else if (a.stype == 'season') {
+            choice.season = b.index;
+            _this.reset();
+        } else if (a.stype == 'voice') {
+            choice.voice = b.index;
+            _this.reset();
+        } else if (a.stype == 'player') { // ← НОВЫЙ ТИП
+            choice.player = b.index;
+            _this.reset();
+        }
+    }
+};
 
         filter.render().find('.filter--sort span').text(Lampa.Lang.translate('online_mod_balanser'));
         files.appendHead(filter.render());
@@ -452,94 +455,113 @@ function component(object) {
     };
 
     this.fetchYaniByKpId = function (kp_id) {
-    var url = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
     var headers = { 'X-Application': YANI_APP_TOKEN };
 
+    // Шаг 1: Получаем основную информацию об аниме по kp_id
+    var animeInfoUrl = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
     network.timeout(10000);
-    network.native(url, function (json) {
-        if (json?.response?.length) {
-            var anime = json.response[0];
-            var anime_id = anime.anime_id;
-
-            // Теперь запрашиваем ВИДЕО по anime_id
-            var videosUrl = 'https://api.yani.tv/anime/' + anime_id + '/videos';
-            network.timeout(10000);
-            network.native(videosUrl, function (videosJson) {
-                if (videosJson?.response?.length) {
-                    // Добавляем videos к основному объекту
-                    anime.videos = videosJson.response;
-                    extract.yani = anime;
-                    // Группируем видео по озвучкам и плеерам
-var translatesMap = {};
-var playersMap = {};
-var seasonsSet = new Set();
-
-data.translates?.forEach(t => {
-    translatesMap[t.value] = t.title;
-});
-
-data.videos.forEach(video => {
-    var dub = video.data?.dubbing || 'default';
-    var player = video.data?.player || 'default';
-
-    if (!translatesMap[dub]) translatesMap[dub] = dub;
-    if (!playersMap[player]) playersMap[player] = player;
-
-    seasonsSet.add(video.number); // Предполагаем, что номер эпизода = сезон
-});
-
-// Заполняем фильтры
-filter_items.voice = Object.keys(translatesMap).map(id => ({ id: id, title: translatesMap[id] }));
-filter_items.player = Object.keys(playersMap).map(name => ({ name: name, title: name })); // Можно улучшить
-filter_items.season = Array.from(seasonsSet).sort().map(s => ({ number: s, title: 'Сезон ' + s }));
-                    self.applyFilter('yani');
-                    self.renderItems('yani', self.filtredYani());
-                    self.loading(false);
-                } else {
-                    self.emptyForQuery(select_title + ' (Yani: нет видео)');
-                }
-            }, function (error) {
-                self.emptyForQuery(select_title + ' (Yani: ошибка загрузки видео)');
-            }, false, { headers: headers });
-        } else {
+    network.native(animeInfoUrl, function (animeInfoJson) {
+        if (!animeInfoJson?.response?.length) {
             self.emptyForQuery(select_title + ' (Yani: аниме не найдено)');
+            return;
         }
+
+        // Сохраняем результат первого запроса
+        var animeData = animeInfoJson.response[0];
+        var anime_id = animeData.anime_id;
+
+        if (!anime_id) {
+            self.emptyForQuery(select_title + ' (Yani: нет ID аниме)');
+            return;
+        }
+
+        // Шаг 2: Получаем видео по anime_id
+        var videosUrl = 'https://api.yani.tv/anime/' + anime_id + '/videos';
+        network.timeout(10000);
+        network.native(videosUrl, function (videosJson) {
+            if (videosJson?.response?.length) {
+                // Добавляем видео к данным об аниме
+                animeData.videos = videosJson.response;
+                extract.yani = animeData; // ← Теперь всё корректно!
+
+                // Готовим данные для фильтров
+                self.prepareYaniFilters(animeData);
+
+                self.applyFilter('yani');
+                self.renderItems('yani', self.filtredYani());
+                self.loading(false);
+            } else {
+                self.emptyForQuery(select_title + ' (Yani: нет видео)');
+            }
+        }, function (error) {
+            console.error('Yani videos error:', error);
+            self.emptyForQuery(select_title + ' (Yani: ошибка загрузки видео)');
+        }, { headers: headers });
+
     }, function (error) {
+        console.error('Yani anime info error:', error);
         self.emptyForQuery(select_title + ' (Yani: ошибка загрузки)');
-    }, false, { headers: headers });
+    }, { headers: headers });
 };
     this.filtredYani = function () {
     var items = [];
     var data = extract.yani;
     if (!data || !data.videos || !data.videos.length) return items;
 
-    // Фильтруем по выбранному плееру
-    var filteredVideos = data.videos.filter(video => {
-        var playerMatch = !filter_items.player.length || filter_items.player[choice.player].name === video.data?.player;
-        var voiceMatch = !filter_items.voice.length || filter_items.voice[choice.voice].id === video.data?.dubbing;
-        var seasonMatch = true; // Для простоты, можно добавить фильтр по сезону
-        return playerMatch && voiceMatch && seasonMatch;
-    });
+    var selectedVoice = filter_items.voice.length ? filter_items.voice[choice.voice]?.id : null;
+    var selectedPlayer = filter_items.player.length ? filter_items.player[choice.player]?.name : null;
 
-    // Сортируем по номеру эпизода
-    filteredVideos.sort((a, b) => parseFloat(a.number) - parseFloat(b.number));
+    data.videos.forEach(ep => {
+        // Применяем фильтры
+        if (selectedVoice && ep.data?.dubbing !== selectedVoice) return;
+        if (selectedPlayer && ep.data?.player !== selectedPlayer) return;
 
-    // Формируем список
-    filteredVideos.forEach(ep => {
         items.push({
             title: Lampa.Lang.translate('torrent_serial_episode') + ' ' + ep.number,
             quality: '360p ~ 1080p',
-            info: ' / ' + (translatesMap[ep.data?.dubbing] || ep.data?.dubbing || '') + ' / ' + ep.data?.player,
-            season: ep.number, // Или используйте data.season
-            episode: parseFloat(ep.number),
+            info: ' / ' + (ep.data?.dubbing || '') + (ep.data?.player ? ' (' + ep.data.player + ')' : ''),
+            season: 1, // Упрощённо
+            episode: parseFloat(ep.number) || 0,
             iframe_url: ep.iframe_url,
             balancer: 'yani'
         });
     });
 
+    // Сортируем по номеру эпизода
+    items.sort((a, b) => a.episode - b.episode);
     return items;
 };
+// Новая функция для подготовки данных фильтрации
+this.prepareYaniFilters = function (animeData) {
+    filter_items.season = [];
+    filter_items.voice = [];
+    filter_items.player = [];
 
+    if (!animeData.videos || !animeData.videos.length) return;
+
+    // Собираем уникальные озвучки и плееры
+    var voiceMap = {};
+    var playerMap = {};
+
+    animeData.videos.forEach(video => {
+        var dub = video.data?.dubbing || 'default';
+        var player = video.data?.player || 'default';
+
+        if (dub && dub !== 'delete') {
+            voiceMap[dub] = dub;
+        }
+        if (player && player !== 'delete') {
+            playerMap[player] = player;
+        }
+    });
+
+    // Заполняем фильтры
+    filter_items.voice = Object.keys(voiceMap).map(id => ({ id: id, title: id }));
+    filter_items.player = Object.keys(playerMap).map(name => ({ name: name, title: name }));
+
+    // Для сезона пока используем один сезон (можно улучшить позже)
+    filter_items.season = [Lampa.Lang.translate('torrent_serial_season') + ' 1'];
+};
     // this.filtredYani = function () {
     //     var items = [];
     //     var data = extract.yani;
@@ -611,13 +633,29 @@ filter_items.season = Array.from(seasonsSet).sort().map(s => ({ number: s, title
                 filter_items.season = pl.seasons.map(s => Lampa.Lang.translate('torrent_serial_season') + ' ' + s.season);
             }
         } else if (balancer === 'yani' && extract.yani) {
-            // Сезон — один (упрощённо)
-            filter_items.season = [Lampa.Lang.translate('torrent_serial_season') + ' 1'];
-            // Озвучки
-            if (extract.yani.translates) {
-                filter_items.voice = extract.yani.translates.map(t => ({ id: t.value, title: t.title }));
-            }
-        }
+    // Сезон — пока один
+    filter_items.season = [Lampa.Lang.translate('torrent_serial_season') + ' 1'];
+
+    // Фильтр по озвучке
+    if (filter_items.voice.length > 1) {
+        select.push({
+            title: Lampa.Lang.translate('torrent_parser_voice'),
+            subtitle: filter_items.voice[choice.voice]?.title || '',
+            items: filter_items.voice.map((v, i) => ({ title: v.title, selected: i === choice.voice, index: i })),
+            stype: 'voice'
+        });
+    }
+
+    // Фильтр по плееру
+    if (filter_items.player.length > 1) {
+        select.push({
+            title: 'Плеер',
+            subtitle: filter_items.player[choice.player]?.title || '',
+            items: filter_items.player.map((p, i) => ({ title: p.title, selected: i === choice.player, index: i })),
+            stype: 'player'
+        });
+    }
+}
 
         // ВСЕГДА показываем выбор источника
         var sources = [
