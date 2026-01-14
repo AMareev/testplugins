@@ -731,6 +731,7 @@ this.prepareYaniFilters = function (animeData) {
                     self.playElement(element, items, balancer);
                 } else if (balancer === 'yani') {
                     self.getStreamYani(element, function (element) {
+                        console.log('ELEMENT!!!', element)
                         self.playElement(element, items, balancer);
                     }, function () {
                         element.loading = false;
