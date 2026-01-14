@@ -425,12 +425,14 @@ function component(object) {
             self.emptyForQuery(title + ' (Yani: название ≥3 символов)');
             return;
         }
+        console.log('YANY title', title)
 
         var url = 'https://api.yani.tv/search?q=' + encodeURIComponent(title);
         var headers = { 'X-Application': YANI_APP_TOKEN };
 
         network.timeout(10000);
         network.native(url, function (json) {
+            console.log('YANY title', json)
             if (json?.response?.length) {
                 var anime = json.response[0];
                 var found_kp_id = anime.remote_ids?.kp_id;
@@ -448,11 +450,13 @@ function component(object) {
     };
 
     this.fetchYaniByKpId = function (kp_id) {
+        console.log('YANY kp_id', kp_id)
         var url = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
         var headers = { 'X-Application': YANI_APP_TOKEN };
 
         network.timeout(10000);
         network.native(url, function (json) {
+            console.log('YANY json2', json)
             if (json?.response?.length) {
                 extract.yani = json.response[0];
                 self.applyFilter('yani');
