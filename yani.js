@@ -837,6 +837,7 @@ this.prepareYaniFilters = function (animeData) {
     // Используем Lampa.Reguest — он ОБХОДИТ CORS
     Lampa.Reguest(fullUrl, function (html) {
         var videoMatch = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
+        console.log('VIDEO MATCH', videoMatch)
         if (videoMatch && videoMatch[1]) {
             var streamUrl = videoMatch[1].trim();
             if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
