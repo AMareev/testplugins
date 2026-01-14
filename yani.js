@@ -830,16 +830,17 @@ this.prepareYaniFilters = function (animeData) {
 
     // === Yani stream extraction ===
     this.getStreamYani = function (element, call, error) {
-        console.log('GET STREAM YANI', element, call, error)
     if (!element.iframe_url) return error();
 
     var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
-        console.log('FULL URL', fullUrl)
+    console.log('[Yani] Запрашиваем URL:', fullUrl);
 
-    // Используем Lampa.Reguest — он ОБХОДИТ CORS
     Lampa.Reguest(fullUrl, function (html) {
+        console.log('[Yani] Получен HTML (первые 200 символов):', html ? html.substring(0, 200) : 'пусто');
+
         var videoMatch = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
-        console.log('VIDEO MATCH', videoMatch)
+        console.log('[Yani] VIDEO MATCH:', videoMatch);
+
         if (videoMatch && videoMatch[1]) {
             var streamUrl = videoMatch[1].trim();
             if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
@@ -860,7 +861,7 @@ this.prepareYaniFilters = function (animeData) {
         console.warn('[Yani] Не найден <video src> или .m3u8');
         error();
     }, function (err) {
-        console.error('[Yani] Reguest error:', err);
+        console.error('[Yani] ОШИБКА запроса к iframe:', err);
         error();
     }, {
         dataType: 'text',
