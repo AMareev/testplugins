@@ -247,9 +247,9 @@ function component(object) {
             var voice = filter_items.voice[choice.voice];
             if (voice) {
                 var translation = data.items.find(c =>
-                    c.seasons && c.seasons.[season_id] && c.translation && c.translation.id === voice.id
+                    c.seasons && c.seasons[season_id] && c.translation && c.translation.id === voice.id
                 );
-                if (translation && translation.seasons && translation.seasons.[season_id] && translation.seasons.[season_id].episodes) {
+                if (translation && translation.seasons && translation.seasons[season_id] && translation.seasons[season_id].episodes) {
                     var episodes = translation.seasons[season_id].episodes;
                     for (var ep in episodes) {
                         items.push({
@@ -637,7 +637,7 @@ this.prepareYaniFilters = function (animeData) {
             var season_id = data.seasons[choice.season].id;
             filter_items.voice = [];
             data.items.forEach(c => {
-                if (c.seasons.[season_id] && c.translation) {
+                if (c.seasons[season_id] && c.translation) {
                     if (!filter_items.voice.some(v => v.id === c.translation.id)) {
                         filter_items.voice.push({ id: c.translation.id, title: c.translation.title });
                     }
