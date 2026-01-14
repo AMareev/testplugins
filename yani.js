@@ -450,69 +450,109 @@ function component(object) {
     };
 
     this.fetchYaniByKpId = function (kp_id) {
-        console.log('YANY kp_id', kp_id)
-        var url = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
-        var headers = { 'X-Application': YANI_APP_TOKEN };
+    var url = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
+    var headers = { 'X-Application': YANI_APP_TOKEN };
 
-        network.timeout(10000);
-        network.native(url, function (json) {
-            console.log('YANY json2', json)
-            if (json?.response?.length) {
-                extract.yani = json.response[0];
-                self.applyFilter('yani');
-                self.renderItems('yani', self.filtredYani());
-                self.loading(false);
-            } else {
-                self.emptyForQuery(select_title + ' (Yani: данные не найдены)');
-            }
-        }, function (error) {
-            self.emptyForQuery(select_title + ' (Yani: ошибка загрузки)');
-        }, false, { headers: headers });
-    };
+    network.timeout(10000);
+    network.native(url, function (json) {
+        if (json?.response?.length) {
+            var anime = json.response[0];
+            var anime_id = anime.anime_id;
 
+            // Теперь запрашиваем ВИДЕО по anime_id
+            var videosUrl = 'https://api.yani.tv/anime/' + anime_id + '/videos';
+            network.timeout(10000);
+            network.native(videosUrl, function (videosJson) {
+                if (videosJson?.response?.length) {
+                    // Добавляем videos к основному объекту
+                    anime.videos = videosJson.response;
+                    extract.yani = anime;
+                    self.applyFilter('yani');
+                    self.renderItems('yani', self.filtredYani());
+                    self.loading(false);
+                } else {
+                    self.emptyForQuery(select_title + ' (Yani: нет видео)');
+                }
+            }, function (error) {
+                self.emptyForQuery(select_title + ' (Yani: ошибка загрузки видео)');
+            }, false, { headers: headers });
+        } else {
+            self.emptyForQuery(select_title + ' (Yani: аниме не найдено)');
+        }
+    }, function (error) {
+        self.emptyForQuery(select_title + ' (Yani: ошибка загрузки)');
+    }, false, { headers: headers });
+};
     this.filtredYani = function () {
-        var items = [];
-        var data = extract.yani;
-        if (!data || !data.videos || !data.videos.length) return items;
+    var items = [];
+    var data = extract.yani;
+    if (!data || !data.videos || !data.videos.length) return items; // ← OK
 
-        var translatesMap = {};
-        data.translates?.forEach(t => {
-            translatesMap[t.value] = t.title;
+    // Если нет translates — используем все видео как одну озвучку
+    var episodes = data.videos;
+    episodes.sort((a, b) => {
+        var aNum = parseFloat(a.number) || 0;
+        var bNum = parseFloat(b.number) || 0;
+        return aNum - bNum;
+    });
+
+    episodes.forEach(ep => {
+        items.push({
+            title: Lampa.Lang.translate('torrent_serial_episode') + ' ' + ep.number,
+            quality: '360p ~ 1080p',
+            info: ep.data?.dubbing ? ' / ' + ep.data.dubbing : '',
+            season: data.season || 1,
+            episode: parseFloat(ep.number) || 0,
+            iframe_url: ep.iframe_url,
+            balancer: 'yani'
         });
+    });
+    return items;
+};
 
-        var episodesByTranslate = {};
-        data.videos.forEach(video => {
-            var dub = video.data?.dubbing || 'default';
-            if (!episodesByTranslate[dub]) episodesByTranslate[dub] = [];
-            episodesByTranslate[dub].push(video);
-        });
+    // this.filtredYani = function () {
+    //     var items = [];
+    //     var data = extract.yani;
+    //     if (!data || !data.videos || !data.videos.length) return items;
 
-        var voiceKeys = Object.keys(episodesByTranslate);
-        if (!voiceKeys.length) return items;
+    //     var translatesMap = {};
+    //     data.translates?.forEach(t => {
+    //         translatesMap[t.value] = t.title;
+    //     });
 
-        var selectedVoice = voiceKeys[choice.voice] || voiceKeys[0];
-        var episodes = episodesByTranslate[selectedVoice];
+    //     var episodesByTranslate = {};
+    //     data.videos.forEach(video => {
+    //         var dub = video.data?.dubbing || 'default';
+    //         if (!episodesByTranslate[dub]) episodesByTranslate[dub] = [];
+    //         episodesByTranslate[dub].push(video);
+    //     });
 
-        episodes.sort((a, b) => {
-            var aNum = parseFloat(a.number) || 0;
-            var bNum = parseFloat(b.number) || 0;
-            return aNum - bNum;
-        });
+    //     var voiceKeys = Object.keys(episodesByTranslate);
+    //     if (!voiceKeys.length) return items;
 
-        episodes.forEach(ep => {
-            items.push({
-                title: Lampa.Lang.translate('torrent_serial_episode') + ' ' + ep.number,
-                quality: '360p ~ 1080p',
-                info: ' / ' + (translatesMap[ep.data?.dubbing] || ep.data?.dubbing || ''),
-                season: data.season || 1,
-                episode: parseFloat(ep.number) || 0,
-                iframe_url: ep.iframe_url,
-                balancer: 'yani'
-            });
-        });
+    //     var selectedVoice = voiceKeys[choice.voice] || voiceKeys[0];
+    //     var episodes = episodesByTranslate[selectedVoice];
 
-        return items;
-    };
+    //     episodes.sort((a, b) => {
+    //         var aNum = parseFloat(a.number) || 0;
+    //         var bNum = parseFloat(b.number) || 0;
+    //         return aNum - bNum;
+    //     });
+
+    //     episodes.forEach(ep => {
+    //         items.push({
+    //             title: Lampa.Lang.translate('torrent_serial_episode') + ' ' + ep.number,
+    //             quality: '360p ~ 1080p',
+    //             info: ' / ' + (translatesMap[ep.data?.dubbing] || ep.data?.dubbing || ''),
+    //             season: data.season || 1,
+    //             episode: parseFloat(ep.number) || 0,
+    //             iframe_url: ep.iframe_url,
+    //             balancer: 'yani'
+    //         });
+    //     });
+
+    //     return items;
+    // };
 
     // === ОБЩИЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
