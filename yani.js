@@ -82,7 +82,6 @@ function component(object) {
                 var part2 = pos !== -1 ? link.substring(pos + 1) : link;
                 return proxy + 'enc/' + encodeURIComponent(btoa(proxy_enc + part1)) + '/' + part2;
             }
-            return proxy + proxy_enc + link;
         }
         return link;
     }
@@ -790,19 +789,20 @@ this.prepareYaniFilters = function (animeData) {
         var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
         console.log('[Yani] Запрашиваем URL через прокси:', fullUrl);
     
-        var prox = proxy('yani');
+        // Настройка прокси с заголовками
+        var prox = 'https://apn-latest.onrender.com/ip/';
         var prox_enc = '';
-        if (prox) {
-            // Добавляем заголовки через прокси
-            prox_enc += 'param/Referer=' + encodeURIComponent('https://yani.tv/') + '/';
-            prox_enc += 'param/Origin=' + encodeURIComponent('https://yani.tv') + '/';
-            prox_enc += 'param/User-Agent=' + encodeURIComponent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36') + '/';
-        }
+        prox_enc += 'param/Referer=' + encodeURIComponent('https://yani.tv/') + '/';
+        prox_enc += 'param/Origin=' + encodeURIComponent('https://yani.tv') + '/';
+        prox_enc += 'param/User-Agent=' + encodeURIComponent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36') + '/';
     
         network.timeout(10000);
-        network.native(proxyLink(fullUrl, prox, prox_enc), function (html) {
-            console.log('[Yani] Получен HTML (первые 200 символов):', html ? html.substring(0, 200) : 'пусто');
+        network.native(proxyLink(fullUrl, prox, prox_enc, 'enc'), function (html) {
+            console.log('[Yani] Получен HTML (первые 500 символов):', html ? html.substring(0, 500) : 'пусто');
+    
+            // Ищем <video src="...">
             var videoMatch = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
+            console.log('YANI videoMatch', videoMatch)
             if (videoMatch && videoMatch[1]) {
                 var streamUrl = videoMatch[1].trim();
                 if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
@@ -811,6 +811,8 @@ this.prepareYaniFilters = function (animeData) {
                 call(element);
                 return;
             }
+    
+            // Или .m3u8 напрямую
             var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
             if (m3u8Match) {
                 element.stream = m3u8Match[1];
@@ -818,6 +820,7 @@ this.prepareYaniFilters = function (animeData) {
                 call(element);
                 return;
             }
+    
             console.warn('[Yani] Не найден <video src> или .m3u8');
             error();
         }, function (err) {
