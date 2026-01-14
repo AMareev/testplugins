@@ -845,6 +845,7 @@ this.prepareYaniFilters = function (animeData) {
     network.native(fullUrl, function (html) {
         // Ищем <video src="...">
         var videoMatch = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
+        console.log('!!!videoMatch', videoMatch)
         if (videoMatch && videoMatch[1]) {
             var streamUrl = videoMatch[1].trim(); // убираем пробелы!
             // Убираем возможный завершающий пробел (как в вашем примере)
