@@ -458,7 +458,9 @@ function component(object) {
     var headers = { 'X-Application': YANI_APP_TOKEN };
 
     // Шаг 1: Получаем основную информацию об аниме по kp_id (GET-запрос)
-    var animeInfoUrl = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
+    var params = new URLSearchParams();
+params.append('kp_ids[]', kp_id);
+var animeInfoUrl = 'https://api.yani.tv/anime?' + params.toString();
     network.timeout(10000);
     network.native(animeInfoUrl, function (animeInfoJson) {
         if (!animeInfoJson?.response?.length) {
