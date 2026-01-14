@@ -563,50 +563,6 @@ this.prepareYaniFilters = function (animeData) {
     // Для сезона пока используем один сезон (можно улучшить позже)
     filter_items.season = [Lampa.Lang.translate('torrent_serial_season') + ' 1'];
 };
-    // this.filtredYani = function () {
-    //     var items = [];
-    //     var data = extract.yani;
-    //     if (!data || !data.videos || !data.videos.length) return items;
-
-    //     var translatesMap = {};
-    //     data.translates.forEach(t => {
-    //         translatesMap[t.value] = t.title;
-    //     });
-
-    //     var episodesByTranslate = {};
-    //     data.videos.forEach(video => {
-    //         var dub = video.data.dubbing || 'default';
-    //         if (!episodesByTranslate[dub]) episodesByTranslate[dub] = [];
-    //         episodesByTranslate[dub].push(video);
-    //     });
-
-    //     var voiceKeys = Object.keys(episodesByTranslate);
-    //     if (!voiceKeys.length) return items;
-
-    //     var selectedVoice = voiceKeys[choice.voice] || voiceKeys[0];
-    //     var episodes = episodesByTranslate[selectedVoice];
-
-    //     episodes.sort((a, b) => {
-    //         var aNum = parseFloat(a.number) || 0;
-    //         var bNum = parseFloat(b.number) || 0;
-    //         return aNum - bNum;
-    //     });
-
-    //     episodes.forEach(ep => {
-    //         items.push({
-    //             title: Lampa.Lang.translate('torrent_serial_episode') + ' ' + ep.number,
-    //             quality: '360p ~ 1080p',
-    //             info: ' / ' + (translatesMap[ep.data.dubbing] || ep.data.dubbing || ''),
-    //             season: data.season || 1,
-    //             episode: parseFloat(ep.number) || 0,
-    //             iframe_url: ep.iframe_url,
-    //             balancer: 'yani'
-    //         });
-    //     });
-
-    //     return items;
-    // };
-
     // === ОБЩИЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
 
@@ -763,84 +719,17 @@ this.prepareYaniFilters = function (animeData) {
         Lampa.Player.play(first);
     };
 
-    // this.playElement = function (element, items, balancer) {
-    //     element.loading = false;
-    //     var first = {
-    //         url: balancer === 'kodik' ? self.getDefaultQuality(element.qualitys, element.stream) : element.stream,
-    //         quality: balancer === 'kodik' ? self.renameQualityMap(element.qualitys) : false,
-    //         subtitles: element.subtitles || false,
-    //         timeline: element.timeline,
-    //         title: element.season ? element.title : select_title + (element.title == select_title ? '' : ' / ' + element.title)
-    //     };
-
-    //     if (element.season && Lampa.Platform.version) {
-    //         var playlist = [];
-    //         items.forEach(function (elem) {
-    //             if (elem == element) {
-    //                 playlist.push(first);
-    //             } else {
-    //                 var cell = {
-    //                     url: function (call) {
-    //                         if (balancer === 'kodik') {
-    //                             self.getStreamKodik(elem, function (elem) {
-    //                                 cell.url = self.getDefaultQuality(elem.qualitys, elem.stream);
-    //                                 cell.quality = self.renameQualityMap(elem.qualitys);
-    //                                 cell.subtitles = elem.subtitles;
-    //                                 call();
-    //                             }, function () { cell.url = ''; call(); });
-    //                         } else if (balancer === 'yani') {
-    //                              // Вместо self.getStreamYani, сразу используем iframe_url
-                                    // element.loading = false; // Убедитесь, что загрузка завершена
-                                
-                                    // var first = {
-                                    //     url: element.iframe_url, // Используем iframe_url как основную ссылку
-                                    //     quality: '360p ~ 1080p', // Можно получить из данных, если есть
-                                    //     subtitles: false, // Настройка субтитров может быть сложнее, зависит от плеера
-                                    //     timeline: element.timeline,
-                                    //     title: element.title // Или сформируйте заголовок, как вам нужно
-                                    // };
-    //                             // self.getStreamYani(elem, function (elem) {
-    //                             //     cell.url = elem.stream;
-    //                             //     call();
-    //                             // }, function () { cell.url = ''; call(); });
-    //                         } else {
-    //                             cell.url = elem.file;
-    //                             call();
-    //                         }
-    //                     },
-    //                     timeline: elem.timeline,
-    //                     title: elem.title
-    //                 };
-    //                 playlist.push(cell);
-    //             }
-    //         });
-    //         Lampa.Player.playlist(playlist);
-    //     } else {
-    //         Lampa.Player.playlist([first]);
-    //     }
-    //     Lampa.Player.play(first);
-
-    //     var viewed = Lampa.Storage.cache('kodik_collaps_view', 5000, []);
-    //     var hash_file = Lampa.Utils.hash(element.season ? [element.season, element.season > 10 ? ':' : '', element.episode, object.movie.original_title, element.title, balancer].join('') : object.movie.original_title + element.title + balancer);
-    //     if (viewed.indexOf(hash_file) == -1) {
-    //         viewed.push(hash_file);
-    //         Lampa.Storage.set('kodik_collaps_view', viewed);
-    //     }
-    // };
-
     // === Yani stream extraction ===
-    this.getStreamYani = function (element, call, error) {
+   this.getStreamYani = function (element, call, error) {
     if (!element.iframe_url) return error();
-
     var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
     console.log('[Yani] Запрашиваем URL:', fullUrl);
 
-    Lampa.Reguest(fullUrl, function (html) {
+    network.timeout(10000);
+    network.native(fullUrl, function (html) {
         console.log('[Yani] Получен HTML (первые 200 символов):', html ? html.substring(0, 200) : 'пусто');
-
         var videoMatch = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
         console.log('[Yani] VIDEO MATCH:', videoMatch);
-
         if (videoMatch && videoMatch[1]) {
             var streamUrl = videoMatch[1].trim();
             if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
@@ -849,7 +738,6 @@ this.prepareYaniFilters = function (animeData) {
             call(element);
             return;
         }
-
         var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
         if (m3u8Match) {
             element.stream = m3u8Match[1];
@@ -857,55 +745,15 @@ this.prepareYaniFilters = function (animeData) {
             call(element);
             return;
         }
-
         console.warn('[Yani] Не найден <video src> или .m3u8');
         error();
     }, function (err) {
         console.error('[Yani] ОШИБКА запроса к iframe:', err);
         error();
-    }, {
-        dataType: 'text',
-        timeout: 10000
+    }, false, {
+        dataType: 'text'
     });
 };
-//     this.getStreamYani = function (element, call, error) {
-//     if (!element.iframe_url) return error();
-
-//     var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
-//     // Используем прокси для обхода CORS
-//     var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(fullUrl);
-
-//     network.timeout(10000);
-//     network.native(proxyUrl, function (html) {
-//         // Ищем <video src="...">
-//         var videoMatch = html.match(/<video[^>]*src\s*=\s*["']([^"']+)["']/i);
-//         if (videoMatch && videoMatch[1]) {
-//             var streamUrl = videoMatch[1].trim();
-//             // Убираем возможный пробел в конце (как в вашем примере)
-//             if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
-
-//             element.stream = streamUrl;
-//             element.qualitys = false;
-//             call(element);
-//             return;
-//         }
-
-//         // Если не нашли — попробуем m3u8 (на случай других плееров)
-//         var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
-//         if (m3u8Match) {
-//             element.stream = m3u8Match[1];
-//             element.qualitys = false;
-//             call(element);
-//             return;
-//         }
-
-//         console.warn('Yani: не найден <video src> или .m3u8 в iframe');
-//         error();
-//     }, function (err) {
-//         console.error('Yani stream fetch error:', err);
-//         error();
-//     }, false, { dataType: 'text' });
-// };
 
     // === Kodik stream extraction ===
     this.getStreamKodik = function (element, call, error) {
