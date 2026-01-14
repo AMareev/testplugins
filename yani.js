@@ -609,7 +609,6 @@ this.prepareYaniFilters = function (animeData) {
 
     // === ОБЩИЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
-    // var filter_items = {};
 
     this.applyFilter = function (balancer) {
     // Не сбрасываем filter_items глобально — он уже подготовлен prepareYaniFilters / extractKodikData и т.д.
@@ -731,21 +730,12 @@ this.prepareYaniFilters = function (animeData) {
                     self.playElement(element, items, balancer);
                 } else if (balancer === 'yani') {
                     console.log('ELEMENT!!!', element)
-                            // element.stream = element.iframe_url.replace(/^\/\//, 'https://');
-                            // element.qualitys = false; // или true, если поддерживаете выбор качества
-                            // self.playElement(element, items, 'yani');
-                    self.getStreamYani(element, function (updatedElement) {
+                          self.getStreamYani(element, function (updatedElement) {
         self.playElement(updatedElement, items, 'yani');
     }, function () {
-        Lampa.Noty.show('Не удалось загрузить видео');
+        element.loading = false;
+        Lampa.Noty.show(Lampa.Lang.translate('online_mod_nolink'));
     });
-                    // self.getStreamYani(element, function (element) {
-                        
-                    //     self.playElement(element, items, balancer);
-                    // }, function () {
-                    //     element.loading = false;
-                    //     Lampa.Noty.show(Lampa.Lang.translate('online_mod_nolink'));
-                    // });
                 }
             });
             scroll.append(item);
@@ -756,6 +746,10 @@ this.prepareYaniFilters = function (animeData) {
     };
 
     this.playElement = function (element, items, balancer) {
+        if (!element.stream) {
+        Lampa.Noty.show('Нет ссылки на видео');
+        return;
+    }
         var first = {
             url: element.stream,
             quality: element.quality || '360p ~ 1080p',
@@ -839,13 +833,12 @@ this.prepareYaniFilters = function (animeData) {
 
     var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
 
-    // Используем Lampa.Reguest — он ОБХОДИТ CORS ВСЕГДА
+    // Используем Lampa.Reguest — он ОБХОДИТ CORS
     Lampa.Reguest(fullUrl, function (html) {
         var videoMatch = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
         if (videoMatch && videoMatch[1]) {
             var streamUrl = videoMatch[1].trim();
             if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
-
             element.stream = streamUrl;
             element.qualitys = false;
             call(element);
