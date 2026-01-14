@@ -377,7 +377,7 @@ function component(object) {
                             audio_tracks: audio_tracks.length ? audio_tracks : false,
                             balancer: 'collaps'
                         });
-                    }
+                    })
                 }
             });
         } else if (data.source) {
