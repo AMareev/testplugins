@@ -22,6 +22,71 @@ function component(object) {
     var filter_items = { season: [], voice: [], player: [] };
     var choice = { season: 0, voice: 0, player: 0 };
 
+    function proxy(name) {
+        var ip = '';
+        var param_ip = '';
+        var proxy2 = 'https://apn-latest.onrender.com/' + (param_ip || 'ip/');
+        if (name === 'yani') return proxy2;
+        return '';
+    }
+
+    function parseURL(link) {
+        var url = {
+            href: link,
+            protocol: '',
+            host: '',
+            origin: '',
+            pathname: '',
+            search: '',
+            hash: ''
+        };
+        var pos = link.indexOf('#');
+        if (pos !== -1) {
+            url.hash = link.substring(pos);
+            link = link.substring(0, pos);
+        }
+        pos = link.indexOf('?');
+        if (pos !== -1) {
+            url.search = link.substring(pos);
+            link = link.substring(0, pos);
+        }
+        pos = link.indexOf(':');
+        var path_pos = link.indexOf('/');
+        if (pos !== -1 && (path_pos === -1 || path_pos > pos)) {
+            url.protocol = link.substring(0, pos + 1);
+            link = link.substring(pos + 1);
+        }
+        if (link.startsWith('//')) {
+            pos = link.indexOf('/', 2);
+            if (pos !== -1) {
+                url.host = link.substring(2, pos);
+                link = link.substring(pos);
+            } else {
+                url.host = link.substring(2);
+                link = '/';
+            }
+            url.origin = url.protocol + '//' + url.host;
+        }
+        url.pathname = link;
+        return url;
+    }
+    
+    function proxyLink(link, proxy, proxy_enc, enc) {
+        if (link && proxy) {
+            if (enc == null) enc = 'enc';
+            if (proxy_enc == null) proxy_enc = '';
+            if (enc === 'enc') {
+                var pos = link.indexOf('/');
+                if (pos !== -1 && link.charAt(pos + 1) === '/') pos++;
+                var part1 = pos !== -1 ? link.substring(0, pos + 1) : '';
+                var part2 = pos !== -1 ? link.substring(pos + 1) : link;
+                return proxy + 'enc/' + encodeURIComponent(btoa(proxy_enc + part1)) + '/' + part2;
+            }
+            return proxy + proxy_enc + link;
+        }
+        return link;
+    }
+
     // === МЕТОДЫ ЖИЗНЕННОГО ЦИКЛА ===
 
     this.create = function () {
@@ -721,39 +786,47 @@ this.prepareYaniFilters = function (animeData) {
 
     // === Yani stream extraction ===
    this.getStreamYani = function (element, call, error) {
-    if (!element.iframe_url) return error();
-    var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
-    console.log('[Yani] Запрашиваем URL:', fullUrl);
-
-    network.timeout(10000);
-    network.native(fullUrl, function (html) {
-        console.log('[Yani] Получен HTML (первые 200 символов):', html ? html.substring(0, 200) : 'пусто');
-        var videoMatch = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
-        console.log('[Yani] VIDEO MATCH:', videoMatch);
-        if (videoMatch && videoMatch[1]) {
-            var streamUrl = videoMatch[1].trim();
-            if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
-            element.stream = streamUrl;
-            element.qualitys = false;
-            call(element);
-            return;
+        if (!element.iframe_url) return error();
+        var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
+        console.log('[Yani] Запрашиваем URL через прокси:', fullUrl);
+    
+        var prox = proxy('yani');
+        var prox_enc = '';
+        if (prox) {
+            // Добавляем заголовки через прокси
+            prox_enc += 'param/Referer=' + encodeURIComponent('https://yani.tv/') + '/';
+            prox_enc += 'param/Origin=' + encodeURIComponent('https://yani.tv') + '/';
+            prox_enc += 'param/User-Agent=' + encodeURIComponent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36') + '/';
         }
-        var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
-        if (m3u8Match) {
-            element.stream = m3u8Match[1];
-            element.qualitys = false;
-            call(element);
-            return;
-        }
-        console.warn('[Yani] Не найден <video src> или .m3u8');
-        error();
-    }, function (err) {
-        console.error('[Yani] ОШИБКА запроса к iframe:', err);
-        error();
-    }, false, {
-        dataType: 'text'
-    });
-};
+    
+        network.timeout(10000);
+        network.native(proxyLink(fullUrl, prox, prox_enc), function (html) {
+            console.log('[Yani] Получен HTML (первые 200 символов):', html ? html.substring(0, 200) : 'пусто');
+            var videoMatch = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
+            if (videoMatch && videoMatch[1]) {
+                var streamUrl = videoMatch[1].trim();
+                if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
+                element.stream = streamUrl;
+                element.qualitys = false;
+                call(element);
+                return;
+            }
+            var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
+            if (m3u8Match) {
+                element.stream = m3u8Match[1];
+                element.qualitys = false;
+                call(element);
+                return;
+            }
+            console.warn('[Yani] Не найден <video src> или .m3u8');
+            error();
+        }, function (err) {
+            console.error('[Yani] ОШИБКА запроса к iframe через прокси:', err);
+            error();
+        }, false, {
+            dataType: 'text'
+        });
+    };
 
     // === Kodik stream extraction ===
     this.getStreamKodik = function (element, call, error) {
