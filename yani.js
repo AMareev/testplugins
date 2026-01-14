@@ -830,9 +830,11 @@ this.prepareYaniFilters = function (animeData) {
 
     // === Yani stream extraction ===
     this.getStreamYani = function (element, call, error) {
+        console.log('GET STREAM YANI', element, call, error)
     if (!element.iframe_url) return error();
 
     var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
+        console.log('FULL URL', fullUrl)
 
     // Используем Lampa.Reguest — он ОБХОДИТ CORS
     Lampa.Reguest(fullUrl, function (html) {
