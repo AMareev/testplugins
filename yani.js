@@ -4,7 +4,7 @@
 // === РАБОЧИЕ ТОКЕНЫ И НАСТРОЙКИ ===
 var KODIK_TOKEN = '41dd95f84c21719b09d6c71182237a25'; // рабочий токен Kodik
 var COLLAPS_PREFER_DASH = false; // false = HLS, true = DASH
-var YANI_APP_TOKEN = 'j437-hwoco9axal1';
+var YANI_APP_TOKEN = 'j437-hwoco9axal1'; // ← ЗАМЕНИ НА СВОЙ!
 
 function component(object) {
     var network = new Lampa.Reguest();
@@ -13,7 +13,7 @@ function component(object) {
     var filter = new Lampa.Filter(object);
 
     var select_title = '';
-    var current_balancer = Lampa.Storage.get('kodik_collaps_balancer', 'kodik'); // kodik или collaps
+    var current_balancer = Lampa.Storage.get('kodik_collaps_balancer', 'kodik'); // kodik, collaps или yani
     var extract = {};
     var self = this;
     var last_bls = Lampa.Storage.field('kodik_collaps_save_last_balanser') === true ? Lampa.Storage.cache('kodik_collaps_last_balanser', 200, {}) : {};
@@ -24,52 +24,49 @@ function component(object) {
 
     this.create = function () {
         var _this = this;
+
         console.log('🎬 Movie object:', object.movie);
-console.log('🔢 kinopoisk_id raw:', object.movie.kinopoisk_id);
-console.log('🔢 kp_id parsed:', parseInt(object.movie.kinopoisk_id));
+        console.log('🔢 kinopoisk_id raw:', object.movie.kinopoisk_id);
+        console.log('🔢 kp_id parsed:', parseInt(object.movie.kinopoisk_id));
 
         this.activity.loader(true);
 
         filter.onSearch = function (value) {
-          Lampa.Activity.replace({
-            search: value,
-            search_date: '',
-            clarification: true
-          });
+            Lampa.Activity.replace({
+                search: value,
+                search_date: '',
+                clarification: true
+            });
         };
 
         filter.onBack = function () {
-          _this.start();
+            _this.start();
         };
 
         filter.onSelect = function (type, a, b) {
-          if (type == 'filter') {
-            if (a.reset) {
-              if (extended) sources[balanser].reset();else _this.start();
-            } else if (a.stype == 'source') {
-              _this.changeBalanser(['kodik', 'collaps', 'yani'][b.index]);
-            } else if (a.stype == 'quality') {
-              forcedQuality = b.title;
-
-              _this.updateQualityFilter();
-            } else {
-              sources[balanser].filter(type, a, b);
+            if (type == 'filter') {
+                if (a.reset) {
+                    _this.reset();
+                } else if (a.stype == 'source') {
+                    _this.changeBalanser(['kodik', 'collaps', 'yani'][b.index]);
+                } else if (a.stype == 'season') {
+                    choice.season = b.index;
+                    _this.reset();
+                } else if (a.stype == 'voice') {
+                    choice.voice = b.index;
+                    _this.reset();
+                }
             }
-          } else if (type == 'sort') {
-            _this.changeBalanser(a.source);
-          }
         };
-        
 
         filter.render().find('.filter--sort span').text(Lampa.Lang.translate('online_mod_balanser'));
         files.appendHead(filter.render());
         files.appendFiles(scroll.render());
         this.search();
         return this.render();
-      };
+    };
 
     this.changeBalanser = function (balanser_name) {
-        // Защита от некорректного значения
         if (!['kodik', 'collaps', 'yani'].includes(balanser_name)) {
             balanser_name = 'kodik';
         }
@@ -79,10 +76,10 @@ console.log('🔢 kp_id parsed:', parseInt(object.movie.kinopoisk_id));
         if (Lampa.Storage.field('kodik_collaps_save_last_balanser') === true) {
             Lampa.Storage.set('kodik_collaps_last_balanser', last_bls);
         }
-        this.reset(); // ← перезапуск поиска без смены активности
+        this.reset();
         setTimeout(this.closeFilter, 10);
     };
-    
+
     this.closeFilter = function () {
         if ($('body').hasClass('selectbox--open')) {
             Lampa.Select.close();
@@ -90,12 +87,10 @@ console.log('🔢 kp_id parsed:', parseInt(object.movie.kinopoisk_id));
     };
 
     this.start = function () {
-        // 🔑 Проверка: если активность сменилась — не запускаем UI
         if (Lampa.Activity.active().activity !== this.activity) return;
 
         Lampa.Background.immediately(Lampa.Utils.cardImgBackground(object.movie));
 
-        // Найдём последний элемент для фокуса
         var last_views = scroll.render().find('.selector.online').find('.torrent-item__viewed').parent().last();
         var last = last_views.length ? last_views[0] : scroll.render().find('.selector')[0] || false;
 
@@ -141,26 +136,26 @@ console.log('🔢 kp_id parsed:', parseInt(object.movie.kinopoisk_id));
     // === ОСНОВНАЯ ЛОГИКА ===
 
     function getValidKpId(id) {
-    if (!id || id === '0' || id === 'null' || id === '') return 0;
-    var num = parseInt(id, 10);
-    return isNaN(num) || num <= 0 ? 0 : num;
-}
-
-this.search = function () {
-    select_title = object.search || object.movie.title;
-    var kp_id = getValidKpId(object.movie.kinopoisk_id);
-    var imdb_id = object.movie.imdb_id || '';
-
-    console.log('🔍 Parsed IDs — kp_id:', kp_id, 'imdb_id:', imdb_id);
-
-    if (current_balancer === 'kodik') {
-        self.searchKodik(kp_id, imdb_id);
-    } else if (current_balancer === 'collaps') {
-        self.searchCollaps(kp_id, imdb_id);
-    } else if (current_balancer === 'yani') {
-        self.searchYani(kp_id); // может быть 0 — это нормально
+        if (!id || id === '0' || id === 'null' || id === '') return 0;
+        var num = parseInt(id, 10);
+        return isNaN(num) || num <= 0 ? 0 : num;
     }
-};
+
+    this.search = function () {
+        select_title = object.search || object.movie.title;
+        var kp_id = getValidKpId(object.movie.kinopoisk_id);
+        var imdb_id = object.movie.imdb_id || '';
+
+        console.log('🔍 Parsed IDs — kp_id:', kp_id, 'imdb_id:', imdb_id);
+
+        if (current_balancer === 'kodik') {
+            self.searchKodik(kp_id, imdb_id);
+        } else if (current_balancer === 'collaps') {
+            self.searchCollaps(kp_id, imdb_id);
+        } else if (current_balancer === 'yani') {
+            self.searchYani(kp_id);
+        }
+    };
 
     this.reset = function () {
         scroll.clear();
@@ -382,7 +377,7 @@ this.search = function () {
                             audio_tracks: audio_tracks.length ? audio_tracks : false,
                             balancer: 'collaps'
                         });
-                    });
+                    }
                 }
             });
         } else if (data.source) {
@@ -416,27 +411,115 @@ this.search = function () {
         return filtred;
     };
 
+    // === YANI ===
+
+    this.searchYani = function (kp_id) {
+        var title = select_title;
+
+        if (kp_id && kp_id > 0) {
+            self.fetchYaniByKpId(kp_id);
+            return;
+        }
+
+        if (!title || title.length < 3) {
+            self.emptyForQuery(title + ' (Yani: название ≥3 символов)');
+            return;
+        }
+
+        var url = 'https://api.yani.tv/search?q=' + encodeURIComponent(title);
+        var headers = { 'X-Application': YANI_APP_TOKEN };
+
+        network.timeout(10000);
+        network.native(url, function (json) {
+            if (json?.response?.length) {
+                var anime = json.response[0];
+                var found_kp_id = anime.remote_ids?.kp_id;
+                if (found_kp_id && found_kp_id > 0) {
+                    self.fetchYaniByKpId(found_kp_id);
+                } else {
+                    self.emptyForQuery(title + ' (Yani: нет ID КиноПоиска)');
+                }
+            } else {
+                self.emptyForQuery(title + ' (Yani: не найдено)');
+            }
+        }, function (error) {
+            self.emptyForQuery(title + ' (Yani: ошибка)');
+        }, false, { headers: headers });
+    };
+
+    this.fetchYaniByKpId = function (kp_id) {
+        var url = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
+        var headers = { 'X-Application': YANI_APP_TOKEN };
+
+        network.timeout(10000);
+        network.native(url, function (json) {
+            if (json?.response?.length) {
+                extract.yani = json.response[0];
+                self.applyFilter('yani');
+                self.renderItems('yani', self.filtredYani());
+                self.loading(false);
+            } else {
+                self.emptyForQuery(select_title + ' (Yani: данные не найдены)');
+            }
+        }, function (error) {
+            self.emptyForQuery(select_title + ' (Yani: ошибка загрузки)');
+        }, false, { headers: headers });
+    };
+
+    this.filtredYani = function () {
+        var items = [];
+        var data = extract.yani;
+        if (!data || !data.videos || !data.videos.length) return items;
+
+        var translatesMap = {};
+        data.translates?.forEach(t => {
+            translatesMap[t.value] = t.title;
+        });
+
+        var episodesByTranslate = {};
+        data.videos.forEach(video => {
+            var dub = video.data?.dubbing || 'default';
+            if (!episodesByTranslate[dub]) episodesByTranslate[dub] = [];
+            episodesByTranslate[dub].push(video);
+        });
+
+        var voiceKeys = Object.keys(episodesByTranslate);
+        if (!voiceKeys.length) return items;
+
+        var selectedVoice = voiceKeys[choice.voice] || voiceKeys[0];
+        var episodes = episodesByTranslate[selectedVoice];
+
+        episodes.sort((a, b) => {
+            var aNum = parseFloat(a.number) || 0;
+            var bNum = parseFloat(b.number) || 0;
+            return aNum - bNum;
+        });
+
+        episodes.forEach(ep => {
+            items.push({
+                title: Lampa.Lang.translate('torrent_serial_episode') + ' ' + ep.number,
+                quality: '360p ~ 1080p',
+                info: ' / ' + (translatesMap[ep.data?.dubbing] || ep.data?.dubbing || ''),
+                season: data.season || 1,
+                episode: parseFloat(ep.number) || 0,
+                iframe_url: ep.iframe_url,
+                balancer: 'yani'
+            });
+        });
+
+        return items;
+    };
+
     // === ОБЩИЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+
+    var filter_items = {};
+
     this.applyFilter = function (balancer) {
-    // ВСЕГДА обновляем список источников
-    var sources = [
-        { title: 'Kodik', selected: current_balancer === 'kodik' },
-        { title: 'Collaps', selected: current_balancer === 'collaps' },
-        { title: 'Yani', selected: current_balancer === 'yani' }
-    ];
+        filter_items = { season: [], voice: [] };
 
-    var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
-    select.push({
-        title: Lampa.Lang.translate('settings_rest_source'),
-        subtitle: current_balancer === 'kodik' ? 'Kodik' :
-                  current_balancer === 'collaps' ? 'Collaps' : 'Yani',
-        items: sources.map((s, i) => ({ title: s.title, selected: s.selected, index: i })),
-        stype: 'source'
-    });
-
-    // Дополнительные фильтры (сезон, озвучка) — только если есть данные
-    if (balancer === 'kodik' && extract.kodik) {
-       var data = extract.kodik;
+        // Обновляем фильтры только если есть данные
+        if (balancer === 'kodik' && extract.kodik) {
+            var data = extract.kodik;
             filter_items.season = data.seasons.map(s => s.title);
             if (filter_items.season.length) {
                 var season_id = data.seasons[choice.season]?.id;
@@ -448,95 +531,61 @@ this.search = function () {
                     }
                 });
             }
-    } else if (balancer === 'collaps' && extract.collaps) {
-       var pl = extract.collaps.playlist;
+        } else if (balancer === 'collaps' && extract.collaps) {
+            var pl = extract.collaps.playlist;
             if (pl && pl.seasons) {
                 filter_items.season = pl.seasons.map(s => Lampa.Lang.translate('torrent_serial_season') + ' ' + s.season);
             }
-    } else if (balancer === 'yani' && extract.yani) {
-        self.getStreamYani(element, function (element) {
-                self.playElement(element, items, balancer);
-            }, function () {
-                element.loading = false;
-                Lampa.Noty.show(Lampa.Lang.translate('online_mod_nolink'));
+        } else if (balancer === 'yani' && extract.yani) {
+            // Сезон — один (упрощённо)
+            filter_items.season = [Lampa.Lang.translate('torrent_serial_season') + ' 1'];
+            // Озвучки
+            if (extract.yani.translates) {
+                filter_items.voice = extract.yani.translates.map(t => ({ id: t.value, title: t.title }));
+            }
+        }
+
+        // ВСЕГДА показываем выбор источника
+        var sources = [
+            { title: 'Kodik', selected: current_balancer === 'kodik' },
+            { title: 'Collaps', selected: current_balancer === 'collaps' },
+            { title: 'Yani', selected: current_balancer === 'yani' }
+        ];
+
+        var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
+        select.push({
+            title: Lampa.Lang.translate('settings_rest_source'),
+            subtitle: current_balancer === 'kodik' ? 'Kodik' :
+                      current_balancer === 'collaps' ? 'Collaps' : 'Yani',
+            items: sources.map((s, i) => ({ title: s.title, selected: s.selected, index: i })),
+            stype: 'source'
+        });
+
+        if (filter_items.season.length > 1) {
+            select.push({
+                title: Lampa.Lang.translate('torrent_serial_season'),
+                subtitle: filter_items.season[choice.season],
+                items: filter_items.season.map((t, i) => ({ title: t, selected: i === choice.season, index: i })),
+                stype: 'season'
             });
-    }
+        }
+        if (filter_items.voice.length) {
+            select.push({
+                title: Lampa.Lang.translate('torrent_parser_voice'),
+                subtitle: filter_items.voice[choice.voice]?.title || '',
+                items: filter_items.voice.map((v, i) => ({ title: v.title, selected: i === choice.voice, index: i })),
+                stype: 'voice'
+            });
+        }
 
-    filter.set('filter', select);
-};
-
-    // this.applyFilter = function (balancer) {
-    //     filter_items = { season: [], voice: [] };
-
-    //     if (balancer === 'kodik') {
-    //         var data = extract.kodik;
-    //         filter_items.season = data.seasons.map(s => s.title);
-    //         if (filter_items.season.length) {
-    //             var season_id = data.seasons[choice.season]?.id;
-    //             data.items.forEach(c => {
-    //                 if (c.seasons?.[season_id] && c.translation) {
-    //                     if (!filter_items.voice.some(v => v.id === c.translation.id)) {
-    //                         filter_items.voice.push({ id: c.translation.id, title: c.translation.title });
-    //                     }
-    //                 }
-    //             });
-    //         }
-    //     } else if (balancer === 'collaps') {
-    //         var pl = extract.collaps.playlist;
-    //         if (pl && pl.seasons) {
-    //             filter_items.season = pl.seasons.map(s => Lampa.Lang.translate('torrent_serial_season') + ' ' + s.season);
-    //         }
-    //     } else if (balancer === 'yani') {
-    //         self.getStreamYani(element, function (element) {
-    //             self.playElement(element, items, balancer);
-    //         }, function () {
-    //             element.loading = false;
-    //             Lampa.Noty.show(Lampa.Lang.translate('online_mod_nolink'));
-    //         });
-    //     }
-
-    //     var sources = [
-    //         { title: 'Kodik', selected: current_balancer === 'kodik' },
-    //         { title: 'Collaps', selected: current_balancer === 'collaps' },
-    //         { title: 'Yani', selected: current_balancer === 'yani' }
-    //     ];
-
-    //     var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
-    //     select.push({
-    //         title: Lampa.Lang.translate('settings_rest_source'),
-    //         subtitle: current_balancer === 'kodik' ? 'Kodik' : 'Collaps',
-    //         items: sources.map((s, i) => ({ title: s.title, selected: s.selected, index: i })),
-    //         stype: 'source'
-    //     });
-
-    //     if (filter_items.season.length > 1) {
-    //         select.push({
-    //             title: Lampa.Lang.translate('torrent_serial_season'),
-    //             subtitle: filter_items.season[choice.season],
-    //             items: filter_items.season.map((t, i) => ({ title: t, selected: i === choice.season, index: i })),
-    //             stype: 'season'
-    //         });
-    //     }
-    //     if (filter_items.voice.length) {
-    //         select.push({
-    //             title: Lampa.Lang.translate('torrent_parser_voice'),
-    //             subtitle: filter_items.voice[choice.voice]?.title || '',
-    //             items: filter_items.voice.map((v, i) => ({ title: v.title, selected: i === choice.voice, index: i })),
-    //             stype: 'voice'
-    //         });
-    //     }
-
-    //     filter.set('filter', select);
-    // };
-
-    var lastItem = null;
-    var filter_items = {};
+        filter.set('filter', select);
+    };
 
     this.renderItems = function (balancer, items) {
         scroll.clear();
         var viewed = Lampa.Storage.cache('kodik_collaps_view', 5000, []);
         var last_episode = this.getLastEpisode(items);
-    
+
         items.forEach(function (element) {
             if (element.season) {
                 element.translate_episode_end = last_episode;
@@ -557,7 +606,7 @@ this.search = function () {
                 if (element.loading) return;
                 if (object.movie.id) Lampa.Favorite.add('history', object.movie, 100);
                 element.loading = true;
-    
+
                 if (balancer === 'kodik') {
                     self.getStreamKodik(element, function (element) {
                         self.playElement(element, items, balancer);
@@ -569,12 +618,18 @@ this.search = function () {
                     element.stream = element.file;
                     element.qualitys = false;
                     self.playElement(element, items, balancer);
+                } else if (balancer === 'yani') {
+                    self.getStreamYani(element, function (element) {
+                        self.playElement(element, items, balancer);
+                    }, function () {
+                        element.loading = false;
+                        Lampa.Noty.show(Lampa.Lang.translate('online_mod_nolink'));
+                    });
                 }
             });
             scroll.append(item);
-            lastItem = item[0];
         });
-    
+
         self.loading(false);
     };
 
@@ -603,6 +658,11 @@ this.search = function () {
                                     cell.subtitles = elem.subtitles;
                                     call();
                                 }, function () { cell.url = ''; call(); });
+                            } else if (balancer === 'yani') {
+                                self.getStreamYani(elem, function (elem) {
+                                    cell.url = elem.stream;
+                                    call();
+                                }, function () { cell.url = ''; call(); });
                             } else {
                                 cell.url = elem.file;
                                 call();
@@ -627,119 +687,14 @@ this.search = function () {
             Lampa.Storage.set('kodik_collaps_view', viewed);
         }
     };
-    // yani
-    this.searchYani = function (kp_id) {
-    var title = select_title;
 
-    // Шаг 1: Если kp_id есть — сразу ищем по нему
-    if (kp_id && kp_id > 0) {
-        self.fetchYaniByKpId(kp_id);
-        return;
-    }
-
-    // Шаг 2: Если kp_id нет — ищем по названию
-    console.log('🔍 [Yani] No kp_id, searching by title:', title);
-
-    if (!title || title.length < 3) {
-        self.emptyForQuery(title + ' (Yani: требуется название ≥3 символов)');
-        return;
-    }
-
-    var url = 'https://api.yani.tv/search?q=' + encodeURIComponent(title);
-    var headers = { 'X-Application': YANI_APP_TOKEN };
-
-    network.timeout(10000);
-    network.native(url, function (json) {
-        if (json?.response?.length) {
-            var anime = json.response[0];
-            var found_kp_id = anime.remote_ids?.kp_id;
-
-            if (found_kp_id && found_kp_id > 0) {
-                console.log('✅ [Yani] Found kp_id via search:', found_kp_id);
-                self.fetchYaniByKpId(found_kp_id);
-            } else {
-                console.warn('⚠️ [Yani] No kp_id in search result');
-                self.emptyForQuery(title + ' (Yani: не найден ID КиноПоиска)');
-            }
-        } else {
-            console.warn('⚠️ [Yani] Nothing found by title:', title);
-            self.emptyForQuery(title + ' (Yani: не найдено)');
-        }
-    }, function (error) {
-        console.error('❌ [Yani] Search failed:', error);
-        self.emptyForQuery(title + ' (Yani: ошибка поиска)');
-    }, false, { headers: headers });
-};
-    this.fetchYaniByKpId = function (kp_id) {
-    var url = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
-    var headers = { 'X-Application': YANI_APP_TOKEN };
-
-    network.timeout(10000);
-    network.native(url, function (json) {
-        if (json?.response?.length) {
-            extract.yani = json.response[0];
-            self.applyFilter('yani');
-            self.renderItems('yani', self.filtredYani());
-            self.loading(false);
-        } else {
-            self.emptyForQuery(select_title + ' (Yani: данные не найдены)');
-        }
-    }, function (error) {
-        self.emptyForQuery(select_title + ' (Yani: ошибка загрузки)');
-    }, false, { headers: headers });
-};
-    this.filtredYani = function () {
-        var items = [];
-        var data = extract.yani;
-        if (!data || !data.videos || !data.videos.length) return items;
-    
-        // Группируем по озвучкам и сезонам
-        var translatesMap = {};
-        data.translates?.forEach(t => {
-            translatesMap[t.value] = t.title;
-        });
-    
-        var episodesByTranslate = {};
-        data.videos.forEach(video => {
-            var dub = video.data?.dubbing || 'default';
-            if (!episodesByTranslate[dub]) episodesByTranslate[dub] = [];
-            episodesByTranslate[dub].push(video);
-        });
-    
-        // Предположим, что у нас один сезон (упрощённо)
-        var voiceKeys = Object.keys(episodesByTranslate);
-        if (!voiceKeys.length) return items;
-    
-        var selectedVoice = voiceKeys[choice.voice] || voiceKeys[0];
-        var episodes = episodesByTranslate[selectedVoice];
-    
-        episodes.sort((a, b) => {
-            var aNum = parseFloat(a.number) || 0;
-            var bNum = parseFloat(b.number) || 0;
-            return aNum - bNum;
-        });
-    
-        episodes.forEach(ep => {
-            items.push({
-                title: Lampa.Lang.translate('torrent_serial_episode') + ' ' + ep.number,
-                quality: '360p ~ 1080p',
-                info: ' / ' + (translatesMap[ep.data?.dubbing] || ep.data?.dubbing || ''),
-                season: data.season || 1,
-                episode: parseFloat(ep.number) || 0,
-                iframe_url: ep.iframe_url,
-                balancer: 'yani'
-            });
-        });
-    
-        return items;
-    };
+    // === Yani stream extraction ===
     this.getStreamYani = function (element, call, error) {
         if (!element.iframe_url) return error();
-    
+
         network.timeout(10000);
         network.native(element.iframe_url, function (html) {
-            // Ищем ссылку на видео в iframe
-            // Пример: может быть в <video src="..."> или в скриптах
+            // Ищем прямую ссылку
             var videoMatch = html.match(/<video[^>]*src=["']([^"']+)["']/i);
             if (videoMatch && videoMatch[1]) {
                 element.stream = videoMatch[1];
@@ -747,8 +702,8 @@ this.search = function () {
                 call(element);
                 return;
             }
-    
-            // Альтернатива: поиск m3u8/dash в скриптах
+
+            // Ищем m3u8
             var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
             if (m3u8Match) {
                 element.stream = m3u8Match[1];
@@ -756,7 +711,8 @@ this.search = function () {
                 call(element);
                 return;
             }
-    
+
+            // TODO: можно добавить поддержку других плееров (Alloha, SovetRomantica и т.д.)
             error();
         }, error, false, { dataType: 'text' });
     };
@@ -841,11 +797,11 @@ this.search = function () {
 
     // === Утилиты ===
     this.loading = function (status) {
-        if (status) this.activity.loader(true);else {
-          this.activity.loader(false);
-          if (Lampa.Activity.active().activity === this.activity && this.inActivity()) this.activity.toggle();
+        if (status) this.activity.loader(true); else {
+            this.activity.loader(false);
+            if (Lampa.Activity.active().activity === this.activity && this.inActivity()) this.activity.toggle();
         }
-      };
+    };
 
     this.emptyForQuery = function (query) {
         var empty = Lampa.Template.get('list_empty');
@@ -960,17 +916,17 @@ Lampa.Component.add('kodik_collaps', component);
 
 Lampa.Manifest.plugins = {
     type: 'video',
-    version: '1.1',
-    name: 'Kodik + Collaps',
-    description: 'Прямой поиск через Kodik и Collaps',
+    version: '1.2',
+    name: 'Kodik + Collaps + Yani',
+    description: 'Прямой поиск через Kodik, Collaps и YummyAnime (Yani)',
     component: 'kodik_collaps',
     onContextMenu: function (obj) {
-        return { name: 'Смотреть на Kodik/Collaps', description: '' };
+        return { name: 'Смотреть на Kodik/Collaps/Yani', description: '' };
     },
     onContextLauch: function (obj) {
         Lampa.Activity.push({
             url: '',
-            title: 'Kodik/Collaps',
+            title: 'Kodik/Collaps/Yani',
             component: 'kodik_collaps',
             movie: obj,
             search: obj.title,
@@ -981,17 +937,17 @@ Lampa.Manifest.plugins = {
 
 Lampa.Listener.follow('full', function (e) {
     if (e.type === 'complite') {
-        var btn = $(`<div class="full-start__button selector" data-subtitle="Kodik + Collaps">
+        var btn = $(`<div class="full-start__button selector" data-subtitle="Kodik + Collaps + Yani">
             <svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="64" cy="64" r="56" stroke="white" stroke-width="16"/>
                 <path d="M90.5 64.3827L50 87.7654L50 41L90.5 64.3827Z" fill="white"/>
             </svg>
-            <span>Kodik/Collaps</span>
+            <span>Kodik/Collaps/Yani</span>
         </div>`);
         btn.on('hover:enter', function () {
             Lampa.Activity.push({
                 url: '',
-                title: 'Kodik/Collaps',
+                title: 'Kodik/Collaps/Yani',
                 component: 'kodik_collaps',
                 movie: e.data.movie,
                 search: e.data.movie.title,
