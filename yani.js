@@ -4,6 +4,7 @@
 // === РАБОЧИЕ ТОКЕНЫ И НАСТРОЙКИ ===
 var KODIK_TOKEN = '41dd95f84c21719b09d6c71182237a25'; // рабочий токен Kodik
 var COLLAPS_PREFER_DASH = false; // false = HLS, true = DASH
+var YANI_APP_TOKEN = 'j437-hwoco9axal1';
 
 function component(object) {
     var network = new Lampa.Reguest();
@@ -43,7 +44,7 @@ function component(object) {
             if (a.reset) {
               if (extended) sources[balanser].reset();else _this.start();
             } else if (a.stype == 'source') {
-              _this.changeBalanser(['kodik', 'collaps'][b.index]);
+              _this.changeBalanser(['kodik', 'collaps', 'yani'][b.index]);
             } else if (a.stype == 'quality') {
               forcedQuality = b.title;
 
@@ -140,6 +141,8 @@ function component(object) {
             self.searchKodik(kp_id, imdb_id);
         } else if (current_balancer === 'collaps') {
             self.searchCollaps(kp_id, imdb_id);
+        } else if (current_balancer === 'yani') {
+            self.searchYani(kp_id); // ← Yani работает только по KP
         }
     };
 
@@ -420,11 +423,19 @@ function component(object) {
             if (pl && pl.seasons) {
                 filter_items.season = pl.seasons.map(s => Lampa.Lang.translate('torrent_serial_season') + ' ' + s.season);
             }
+        } else if (balancer === 'yani') {
+            self.getStreamYani(element, function (element) {
+                self.playElement(element, items, balancer);
+            }, function () {
+                element.loading = false;
+                Lampa.Noty.show(Lampa.Lang.translate('online_mod_nolink'));
+            });
         }
 
         var sources = [
             { title: 'Kodik', selected: current_balancer === 'kodik' },
-            { title: 'Collaps', selected: current_balancer === 'collaps' }
+            { title: 'Collaps', selected: current_balancer === 'collaps' },
+            { title: 'Yani', selected: current_balancer === 'yani' }
         ];
 
         var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
@@ -552,6 +563,99 @@ function component(object) {
             viewed.push(hash_file);
             Lampa.Storage.set('kodik_collaps_view', viewed);
         }
+    };
+    // yani
+    this.searchYani = function (kp_id) {
+        if (!kp_id) return self.emptyForQuery(select_title);
+    
+        var url = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
+        var headers = { 'X-Application': YANI_APP_TOKEN };
+    
+        network.timeout(10000);
+        network.native(url, function (json) {
+            if (json?.response?.length) {
+                extract.yani = json.response[0];
+                self.applyFilter('yani');
+                self.renderItems('yani', self.filtredYani());
+                self.loading(false);
+            } else {
+                self.emptyForQuery(select_title);
+            }
+        }, function () {
+            self.emptyForQuery(select_title);
+        }, false, { headers: headers });
+    };
+    this.filtredYani = function () {
+        var items = [];
+        var data = extract.yani;
+        if (!data || !data.videos || !data.videos.length) return items;
+    
+        // Группируем по озвучкам и сезонам
+        var translatesMap = {};
+        data.translates?.forEach(t => {
+            translatesMap[t.value] = t.title;
+        });
+    
+        var episodesByTranslate = {};
+        data.videos.forEach(video => {
+            var dub = video.data?.dubbing || 'default';
+            if (!episodesByTranslate[dub]) episodesByTranslate[dub] = [];
+            episodesByTranslate[dub].push(video);
+        });
+    
+        // Предположим, что у нас один сезон (упрощённо)
+        var voiceKeys = Object.keys(episodesByTranslate);
+        if (!voiceKeys.length) return items;
+    
+        var selectedVoice = voiceKeys[choice.voice] || voiceKeys[0];
+        var episodes = episodesByTranslate[selectedVoice];
+    
+        episodes.sort((a, b) => {
+            var aNum = parseFloat(a.number) || 0;
+            var bNum = parseFloat(b.number) || 0;
+            return aNum - bNum;
+        });
+    
+        episodes.forEach(ep => {
+            items.push({
+                title: Lampa.Lang.translate('torrent_serial_episode') + ' ' + ep.number,
+                quality: '360p ~ 1080p',
+                info: ' / ' + (translatesMap[ep.data?.dubbing] || ep.data?.dubbing || ''),
+                season: data.season || 1,
+                episode: parseFloat(ep.number) || 0,
+                iframe_url: ep.iframe_url,
+                balancer: 'yani'
+            });
+        });
+    
+        return items;
+    };
+    this.getStreamYani = function (element, call, error) {
+        if (!element.iframe_url) return error();
+    
+        network.timeout(10000);
+        network.native(element.iframe_url, function (html) {
+            // Ищем ссылку на видео в iframe
+            // Пример: может быть в <video src="..."> или в скриптах
+            var videoMatch = html.match(/<video[^>]*src=["']([^"']+)["']/i);
+            if (videoMatch && videoMatch[1]) {
+                element.stream = videoMatch[1];
+                element.qualitys = false;
+                call(element);
+                return;
+            }
+    
+            // Альтернатива: поиск m3u8/dash в скриптах
+            var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
+            if (m3u8Match) {
+                element.stream = m3u8Match[1];
+                element.qualitys = false;
+                call(element);
+                return;
+            }
+    
+            error();
+        }, error, false, { dataType: 'text' });
     };
 
     // === Kodik stream extraction ===
