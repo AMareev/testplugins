@@ -629,26 +629,65 @@ this.search = function () {
     };
     // yani
     this.searchYani = function (kp_id) {
-        console.log('searchYani called with kp_id:', kp_id);
-        if (!kp_id) return self.emptyForQuery(select_title);
-    
-        var url = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
-        var headers = { 'X-Application': YANI_APP_TOKEN };
-    
-        network.timeout(10000);
-        network.native(url, function (json) {
-            if (json?.response?.length) {
-                extract.yani = json.response[0];
-                self.applyFilter('yani');
-                self.renderItems('yani', self.filtredYani());
-                self.loading(false);
+    var title = select_title;
+
+    // Шаг 1: Если kp_id есть — сразу ищем по нему
+    if (kp_id && kp_id > 0) {
+        self.fetchYaniByKpId(kp_id);
+        return;
+    }
+
+    // Шаг 2: Если kp_id нет — ищем по названию
+    console.log('🔍 [Yani] No kp_id, searching by title:', title);
+
+    if (!title || title.length < 3) {
+        self.emptyForQuery(title + ' (Yani: требуется название ≥3 символов)');
+        return;
+    }
+
+    var url = 'https://api.yani.tv/search?q=' + encodeURIComponent(title);
+    var headers = { 'X-Application': YANI_APP_TOKEN };
+
+    network.timeout(10000);
+    network.native(url, function (json) {
+        if (json?.response?.length) {
+            var anime = json.response[0];
+            var found_kp_id = anime.remote_ids?.kp_id;
+
+            if (found_kp_id && found_kp_id > 0) {
+                console.log('✅ [Yani] Found kp_id via search:', found_kp_id);
+                self.fetchYaniByKpId(found_kp_id);
             } else {
-                self.emptyForQuery(select_title);
+                console.warn('⚠️ [Yani] No kp_id in search result');
+                self.emptyForQuery(title + ' (Yani: не найден ID КиноПоиска)');
             }
-        }, function () {
-            self.emptyForQuery(select_title);
-        }, false, { headers: headers });
-    };
+        } else {
+            console.warn('⚠️ [Yani] Nothing found by title:', title);
+            self.emptyForQuery(title + ' (Yani: не найдено)');
+        }
+    }, function (error) {
+        console.error('❌ [Yani] Search failed:', error);
+        self.emptyForQuery(title + ' (Yani: ошибка поиска)');
+    }, false, { headers: headers });
+};
+    this.fetchYaniByKpId = function (kp_id) {
+    var url = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
+    var headers = { 'X-Application': YANI_APP_TOKEN };
+
+    network.timeout(10000);
+    network.native(url, function (json) {
+        if (json?.response?.length) {
+            extract.yani = json.response[0];
+            self.applyFilter('yani');
+            self.renderItems('yani', self.filtredYani());
+            self.loading(false);
+        } else {
+            self.emptyForQuery(select_title + ' (Yani: данные не найдены)');
+        }
+    }, function (error) {
+        self.emptyForQuery(select_title + ' (Yani: ошибка загрузки)');
+    }, false, { headers: headers });
+};
     this.filtredYani = function () {
         var items = [];
         var data = extract.yani;
