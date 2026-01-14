@@ -456,27 +456,25 @@ function component(object) {
 
     this.fetchYaniByKpId = function (kp_id) {
     var headers = { 'X-Application': YANI_APP_TOKEN };
-
-    // Шаг 1: Получаем основную информацию об аниме по kp_id (GET-запрос)
+    
     var params = new URLSearchParams();
-params.append('kp_ids[]', kp_id);
-var animeInfoUrl = 'https://api.yani.tv/anime?' + params.toString();
+    params.append('kp_ids[]', kp_id);
+    var animeInfoUrl = 'https://api.yani.tv/anime?' + params.toString();
+
     network.timeout(10000);
     network.native(animeInfoUrl, function (animeInfoJson) {
         if (!animeInfoJson?.response?.length) {
             self.emptyForQuery(select_title + ' (Yani: аниме не найдено)');
             return;
         }
-
         var animeData = animeInfoJson.response[0];
         var anime_id = animeData.anime_id;
-
         if (!anime_id) {
             self.emptyForQuery(select_title + ' (Yani: нет ID аниме)');
             return;
         }
 
-        // Шаг 2: Получаем видео по anime_id (тоже GET-запрос)
+        // Запрос видео
         var videosUrl = 'https://api.yani.tv/anime/' + anime_id + '/videos';
         network.timeout(10000);
         network.native(videosUrl, function (videosJson) {
@@ -493,17 +491,17 @@ var animeInfoUrl = 'https://api.yani.tv/anime?' + params.toString();
         }, function (error) {
             console.error('Yani videos error:', error);
             self.emptyForQuery(select_title + ' (Yani: ошибка загрузки видео)');
-        }, { 
+        }, false, {
             headers: headers,
-            method: 'GET' // ← КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+            method: 'GET'  // ← уже есть, хорошо
         });
 
     }, function (error) {
         console.error('Yani anime info error:', error);
         self.emptyForQuery(select_title + ' (Yani: ошибка загрузки)');
-    }, { 
+    }, false, {
         headers: headers,
-        method: 'GET' // ← КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+        method: 'GET'  // ← ДОБАВЬТЕ ЭТОТ ПАРАМЕТР!
     });
 };
     this.filtredYani = function () {
