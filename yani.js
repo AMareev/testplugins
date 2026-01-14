@@ -612,33 +612,66 @@ this.prepareYaniFilters = function (animeData) {
     // var filter_items = {};
 
     this.applyFilter = function (balancer) {
-        filter_items = { season: [], voice: [], player: []};
+    // Не сбрасываем filter_items глобально — он уже подготовлен prepareYaniFilters / extractKodikData и т.д.
+    var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
 
-        // Обновляем фильтры только если есть данные
-        if (balancer === 'kodik' && extract.kodik) {
-            var data = extract.kodik;
-            filter_items.season = data.seasons.map(s => s.title);
-            if (filter_items.season.length) {
-                var season_id = data.seasons[choice.season]?.id;
-                data.items.forEach(c => {
-                    if (c.seasons?.[season_id] && c.translation) {
-                        if (!filter_items.voice.some(v => v.id === c.translation.id)) {
-                            filter_items.voice.push({ id: c.translation.id, title: c.translation.title });
-                        }
+    // ВСЕГДА показываем выбор источника
+    var sources = [
+        { title: 'Kodik', selected: current_balancer === 'kodik' },
+        { title: 'Collaps', selected: current_balancer === 'collaps' },
+        { title: 'Yani', selected: current_balancer === 'yani' }
+    ];
+    select.push({
+        title: Lampa.Lang.translate('settings_rest_source'),
+        subtitle: current_balancer === 'kodik' ? 'Kodik' :
+                  current_balancer === 'collaps' ? 'Collaps' : 'Yani',
+        items: sources.map((s, i) => ({ title: s.title, selected: s.selected, index: i })),
+        stype: 'source'
+    });
+
+    // Обработка фильтров в зависимости от балансера
+    if (balancer === 'kodik' && extract.kodik) {
+        var data = extract.kodik;
+        filter_items.season = data.seasons.map(s => s.title);
+        if (filter_items.season.length) {
+            var season_id = data.seasons[choice.season]?.id;
+            filter_items.voice = [];
+            data.items.forEach(c => {
+                if (c.seasons?.[season_id] && c.translation) {
+                    if (!filter_items.voice.some(v => v.id === c.translation.id)) {
+                        filter_items.voice.push({ id: c.translation.id, title: c.translation.title });
                     }
-                });
-            }
-        } else if (balancer === 'collaps' && extract.collaps) {
-            var pl = extract.collaps.playlist;
-            if (pl && pl.seasons) {
-                filter_items.season = pl.seasons.map(s => Lampa.Lang.translate('torrent_serial_season') + ' ' + s.season);
-            }
-        } else if (balancer === 'yani' && extract.yani) {
-    // Сезон — пока один
-    filter_items.season = [Lampa.Lang.translate('torrent_serial_season') + ' 1'];
+                }
+            });
+        }
+    } else if (balancer === 'collaps' && extract.collaps) {
+        var pl = extract.collaps.playlist;
+        if (pl && pl.seasons) {
+            filter_items.season = pl.seasons.map(s => Lampa.Lang.translate('torrent_serial_season') + ' ' + s.season);
+        } else {
+            filter_items.season = [];
+        }
+        filter_items.voice = [];
+        filter_items.player = [];
+    } else if (balancer === 'yani' && extract.yani) {
+        // filter_items уже заполнен в prepareYaniFilters — НЕ ОЧИЩАЕМ!
+        // Ничего не делаем — просто используем готовые filter_items.season/voice/player
+    } else {
+        // На случай, если данных нет — сбрасываем
+        filter_items = { season: [], voice: [], player: [] };
+    }
 
-    // Фильтр по озвучке
-    if (filter_items.voice.length > 1) {
+    // Добавляем фильтры в интерфейс
+    if (filter_items.season.length > 1) {
+        select.push({
+            title: Lampa.Lang.translate('torrent_serial_season'),
+            subtitle: filter_items.season[choice.season],
+            items: filter_items.season.map((t, i) => ({ title: t, selected: i === choice.season, index: i })),
+            stype: 'season'
+        });
+    }
+
+    if (filter_items.voice.length > 0) {
         select.push({
             title: Lampa.Lang.translate('torrent_parser_voice'),
             subtitle: filter_items.voice[choice.voice]?.title || '',
@@ -647,8 +680,7 @@ this.prepareYaniFilters = function (animeData) {
         });
     }
 
-    // Фильтр по плееру
-    if (filter_items.player.length > 1) {
+    if (filter_items.player && filter_items.player.length > 0) {
         select.push({
             title: 'Плеер',
             subtitle: filter_items.player[choice.player]?.title || '',
@@ -656,68 +688,9 @@ this.prepareYaniFilters = function (animeData) {
             stype: 'player'
         });
     }
-}
 
-        // ВСЕГДА показываем выбор источника
-        var sources = [
-            { title: 'Kodik', selected: current_balancer === 'kodik' },
-            { title: 'Collaps', selected: current_balancer === 'collaps' },
-            { title: 'Yani', selected: current_balancer === 'yani' }
-        ];
-        if (balancer === 'yani' && extract.yani) {
-    var pl = extract.yani.playlist;
-    if (pl && pl.seasons) {
-        filter_items.season = pl.seasons.map(s => Lampa.Lang.translate('torrent_serial_season') + ' ' + s.season);
-    }
-
-    // Добавляем фильтры по озвучке и плееру
-    if (filter_items.voice.length) {
-        select.push({
-            title: Lampa.Lang.translate('torrent_parser_voice'),
-            subtitle: filter_items.voice[choice.voice]?.title || '',
-            items: filter_items.voice.map((v, i) => ({ title: v.title, selected: i === choice.voice, index: i })),
-            stype: 'voice'
-        });
-    }
-
-    if (filter_items.player.length) {
-        select.push({
-            title: 'Плеер',
-            subtitle: filter_items.player[choice.player]?.title || '',
-            items: filter_items.player.map((p, i) => ({ title: p.title, selected: i === choice.player, index: i })),
-            stype: 'player'
-        });
-    }
-}
-
-        var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
-        select.push({
-            title: Lampa.Lang.translate('settings_rest_source'),
-            subtitle: current_balancer === 'kodik' ? 'Kodik' :
-                      current_balancer === 'collaps' ? 'Collaps' : 'Yani',
-            items: sources.map((s, i) => ({ title: s.title, selected: s.selected, index: i })),
-            stype: 'source'
-        });
-
-        if (filter_items.season.length > 1) {
-            select.push({
-                title: Lampa.Lang.translate('torrent_serial_season'),
-                subtitle: filter_items.season[choice.season],
-                items: filter_items.season.map((t, i) => ({ title: t, selected: i === choice.season, index: i })),
-                stype: 'season'
-            });
-        }
-        if (filter_items.voice.length) {
-            select.push({
-                title: Lampa.Lang.translate('torrent_parser_voice'),
-                subtitle: filter_items.voice[choice.voice]?.title || '',
-                items: filter_items.voice.map((v, i) => ({ title: v.title, selected: i === choice.voice, index: i })),
-                stype: 'voice'
-            });
-        }
-
-        filter.set('filter', select);
-    };
+    filter.set('filter', select);
+};
 
     this.renderItems = function (balancer, items) {
         scroll.clear();
