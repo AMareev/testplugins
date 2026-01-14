@@ -457,7 +457,7 @@ function component(object) {
     this.fetchYaniByKpId = function (kp_id) {
     var headers = { 'X-Application': YANI_APP_TOKEN };
 
-    // Шаг 1: Получаем основную информацию об аниме по kp_id
+    // Шаг 1: Получаем основную информацию об аниме по kp_id (GET-запрос)
     var animeInfoUrl = 'https://api.yani.tv/anime?kp_ids[]=' + kp_id;
     network.timeout(10000);
     network.native(animeInfoUrl, function (animeInfoJson) {
@@ -466,7 +466,6 @@ function component(object) {
             return;
         }
 
-        // Сохраняем результат первого запроса
         var animeData = animeInfoJson.response[0];
         var anime_id = animeData.anime_id;
 
@@ -475,18 +474,14 @@ function component(object) {
             return;
         }
 
-        // Шаг 2: Получаем видео по anime_id
+        // Шаг 2: Получаем видео по anime_id (тоже GET-запрос)
         var videosUrl = 'https://api.yani.tv/anime/' + anime_id + '/videos';
         network.timeout(10000);
         network.native(videosUrl, function (videosJson) {
             if (videosJson?.response?.length) {
-                // Добавляем видео к данным об аниме
                 animeData.videos = videosJson.response;
-                extract.yani = animeData; // ← Теперь всё корректно!
-
-                // Готовим данные для фильтров
+                extract.yani = animeData;
                 self.prepareYaniFilters(animeData);
-
                 self.applyFilter('yani');
                 self.renderItems('yani', self.filtredYani());
                 self.loading(false);
@@ -496,12 +491,18 @@ function component(object) {
         }, function (error) {
             console.error('Yani videos error:', error);
             self.emptyForQuery(select_title + ' (Yani: ошибка загрузки видео)');
-        }, { headers: headers });
+        }, { 
+            headers: headers,
+            method: 'GET' // ← КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+        });
 
     }, function (error) {
         console.error('Yani anime info error:', error);
         self.emptyForQuery(select_title + ' (Yani: ошибка загрузки)');
-    }, { headers: headers });
+    }, { 
+        headers: headers,
+        method: 'GET' // ← КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+    });
 };
     this.filtredYani = function () {
     var items = [];
