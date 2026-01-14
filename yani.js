@@ -837,18 +837,13 @@ this.prepareYaniFilters = function (animeData) {
     this.getStreamYani = function (element, call, error) {
     if (!element.iframe_url) return error();
 
-    // Преобразуем относительный URL в абсолютный
     var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
 
-    network.timeout(10000);
-    // Используем ВСТРОЕННЫЙ прокси Lampa (обход CORS)
-    network.native(fullUrl, function (html) {
-        // Ищем <video src="...">
+    // Используем Lampa.Reguest — он ОБХОДИТ CORS ВСЕГДА
+    Lampa.Reguest(fullUrl, function (html) {
         var videoMatch = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
-        console.log('!!!videoMatch', videoMatch)
         if (videoMatch && videoMatch[1]) {
-            var streamUrl = videoMatch[1].trim(); // убираем пробелы!
-            // Убираем возможный завершающий пробел (как в вашем примере)
+            var streamUrl = videoMatch[1].trim();
             if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
 
             element.stream = streamUrl;
@@ -857,7 +852,6 @@ this.prepareYaniFilters = function (animeData) {
             return;
         }
 
-        // На всякий случай ищем .m3u8
         var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
         if (m3u8Match) {
             element.stream = m3u8Match[1];
@@ -869,11 +863,11 @@ this.prepareYaniFilters = function (animeData) {
         console.warn('[Yani] Не найден <video src> или .m3u8');
         error();
     }, function (err) {
-        console.error('[Yani] Ошибка загрузки iframe:', err);
+        console.error('[Yani] Reguest error:', err);
         error();
-    }, false, {
+    }, {
         dataType: 'text',
-        use_proxy: true  // ← КЛЮЧЕВОЙ ПАРАМЕТР!
+        timeout: 10000
     });
 };
 //     this.getStreamYani = function (element, call, error) {
