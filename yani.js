@@ -746,6 +746,7 @@ this.prepareYaniFilters = function (animeData) {
     };
 
     this.playElement = function (element, items, balancer) {
+        console.log('PLAY ELEMENT', element, items, balancer)
         if (!element.stream) {
         Lampa.Noty.show('Нет ссылки на видео');
         return;
