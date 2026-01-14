@@ -837,33 +837,43 @@ this.prepareYaniFilters = function (animeData) {
     this.getStreamYani = function (element, call, error) {
     if (!element.iframe_url) return error();
 
+    // Преобразуем относительный URL в абсолютный
     var fullUrl = element.iframe_url.replace(/^\/\//, 'https://');
-    var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(fullUrl);
 
-    console.log('[Yani] Запрос через прокси:', proxyUrl);
-
-    network.timeout(15000);
-    network.native(proxyUrl, function (html) {
+    network.timeout(10000);
+    // Используем ВСТРОЕННЫЙ прокси Lampa (обход CORS)
+    network.native(fullUrl, function (html) {
         // Ищем <video src="...">
-        var match = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
-        if (match && match[1]) {
-            var streamUrl = match[1].trim(); // ← trim() уберёт пробелы!
-            console.log('[Yani] Найден видео URL:', streamUrl);
+        var videoMatch = html.match(/<video[^>]*\ssrc\s*=\s*["']([^"']+)["']/i);
+        if (videoMatch && videoMatch[1]) {
+            var streamUrl = videoMatch[1].trim(); // убираем пробелы!
+            // Убираем возможный завершающий пробел (как в вашем примере)
+            if (streamUrl.endsWith(' ')) streamUrl = streamUrl.slice(0, -1);
 
-            if (streamUrl && (streamUrl.endsWith('.mpd') || streamUrl.endsWith('.m3u8'))) {
-                element.stream = streamUrl;
-                element.qualitys = false;
-                call(element);
-                return;
-            }
+            element.stream = streamUrl;
+            element.qualitys = false;
+            call(element);
+            return;
         }
 
-        console.warn('[Yani] Не удалось найти <video src> в HTML');
+        // На всякий случай ищем .m3u8
+        var m3u8Match = html.match(/(https?:\/\/[^"'\s]*\.m3u8)/i);
+        if (m3u8Match) {
+            element.stream = m3u8Match[1];
+            element.qualitys = false;
+            call(element);
+            return;
+        }
+
+        console.warn('[Yani] Не найден <video src> или .m3u8');
         error();
     }, function (err) {
         console.error('[Yani] Ошибка загрузки iframe:', err);
         error();
-    }, false, { dataType: 'text' });
+    }, false, {
+        dataType: 'text',
+        use_proxy: true  // ← КЛЮЧЕВОЙ ПАРАМЕТР!
+    });
 };
 //     this.getStreamYani = function (element, call, error) {
 //     if (!element.iframe_url) return error();
