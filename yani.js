@@ -612,7 +612,7 @@ this.prepareYaniFilters = function (animeData) {
     // var filter_items = {};
 
     this.applyFilter = function (balancer) {
-        filter_items = { season: [], voice: [] };
+        filter_items = { season: [], voice: [], player: []};
 
         // Обновляем фильтры только если есть данные
         if (balancer === 'kodik' && extract.kodik) {
