@@ -18,7 +18,9 @@ function component(object) {
     var self = this;
     var last_bls = Lampa.Storage.field('kodik_collaps_save_last_balanser') === true ? Lampa.Storage.cache('kodik_collaps_last_balanser', 200, {}) : {};
 
-    var choice = { season: 0, voice: 0 };
+    // var choice = { season: 0, voice: 0 };
+    var filter_items = { season: [], voice: [], player: [] };
+    var choice = { season: 0, voice: 0, player: 0 };
 
     // === МЕТОДЫ ЖИЗНЕННОГО ЦИКЛА ===
 
@@ -467,6 +469,29 @@ function component(object) {
                     // Добавляем videos к основному объекту
                     anime.videos = videosJson.response;
                     extract.yani = anime;
+                    // Группируем видео по озвучкам и плеерам
+var translatesMap = {};
+var playersMap = {};
+var seasonsSet = new Set();
+
+data.translates?.forEach(t => {
+    translatesMap[t.value] = t.title;
+});
+
+data.videos.forEach(video => {
+    var dub = video.data?.dubbing || 'default';
+    var player = video.data?.player || 'default';
+
+    if (!translatesMap[dub]) translatesMap[dub] = dub;
+    if (!playersMap[player]) playersMap[player] = player;
+
+    seasonsSet.add(video.number); // Предполагаем, что номер эпизода = сезон
+});
+
+// Заполняем фильтры
+filter_items.voice = Object.keys(translatesMap).map(id => ({ id: id, title: translatesMap[id] }));
+filter_items.player = Object.keys(playersMap).map(name => ({ name: name, title: name })); // Можно улучшить
+filter_items.season = Array.from(seasonsSet).sort().map(s => ({ number: s, title: 'Сезон ' + s }));
                     self.applyFilter('yani');
                     self.renderItems('yani', self.filtredYani());
                     self.loading(false);
@@ -486,27 +511,32 @@ function component(object) {
     this.filtredYani = function () {
     var items = [];
     var data = extract.yani;
-    if (!data || !data.videos || !data.videos.length) return items; // ← OK
+    if (!data || !data.videos || !data.videos.length) return items;
 
-    // Если нет translates — используем все видео как одну озвучку
-    var episodes = data.videos;
-    episodes.sort((a, b) => {
-        var aNum = parseFloat(a.number) || 0;
-        var bNum = parseFloat(b.number) || 0;
-        return aNum - bNum;
+    // Фильтруем по выбранному плееру
+    var filteredVideos = data.videos.filter(video => {
+        var playerMatch = !filter_items.player.length || filter_items.player[choice.player].name === video.data?.player;
+        var voiceMatch = !filter_items.voice.length || filter_items.voice[choice.voice].id === video.data?.dubbing;
+        var seasonMatch = true; // Для простоты, можно добавить фильтр по сезону
+        return playerMatch && voiceMatch && seasonMatch;
     });
 
-    episodes.forEach(ep => {
+    // Сортируем по номеру эпизода
+    filteredVideos.sort((a, b) => parseFloat(a.number) - parseFloat(b.number));
+
+    // Формируем список
+    filteredVideos.forEach(ep => {
         items.push({
             title: Lampa.Lang.translate('torrent_serial_episode') + ' ' + ep.number,
             quality: '360p ~ 1080p',
-            info: ep.data?.dubbing ? ' / ' + ep.data.dubbing : '',
-            season: data.season || 1,
-            episode: parseFloat(ep.number) || 0,
+            info: ' / ' + (translatesMap[ep.data?.dubbing] || ep.data?.dubbing || '') + ' / ' + ep.data?.player,
+            season: ep.number, // Или используйте data.season
+            episode: parseFloat(ep.number),
             iframe_url: ep.iframe_url,
             balancer: 'yani'
         });
     });
+
     return items;
 };
 
@@ -595,6 +625,31 @@ function component(object) {
             { title: 'Collaps', selected: current_balancer === 'collaps' },
             { title: 'Yani', selected: current_balancer === 'yani' }
         ];
+        if (balancer === 'yani' && extract.yani) {
+    var pl = extract.yani.playlist;
+    if (pl && pl.seasons) {
+        filter_items.season = pl.seasons.map(s => Lampa.Lang.translate('torrent_serial_season') + ' ' + s.season);
+    }
+
+    // Добавляем фильтры по озвучке и плееру
+    if (filter_items.voice.length) {
+        select.push({
+            title: Lampa.Lang.translate('torrent_parser_voice'),
+            subtitle: filter_items.voice[choice.voice]?.title || '',
+            items: filter_items.voice.map((v, i) => ({ title: v.title, selected: i === choice.voice, index: i })),
+            stype: 'voice'
+        });
+    }
+
+    if (filter_items.player.length) {
+        select.push({
+            title: 'Плеер',
+            subtitle: filter_items.player[choice.player]?.title || '',
+            items: filter_items.player.map((p, i) => ({ title: p.title, selected: i === choice.player, index: i })),
+            stype: 'player'
+        });
+    }
+}
 
         var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
         select.push({
@@ -673,6 +728,7 @@ function component(object) {
             });
             scroll.append(item);
         });
+        scroll.refresh();
 
         self.loading(false);
     };
@@ -703,10 +759,20 @@ function component(object) {
                                     call();
                                 }, function () { cell.url = ''; call(); });
                             } else if (balancer === 'yani') {
-                                self.getStreamYani(elem, function (elem) {
-                                    cell.url = elem.stream;
-                                    call();
-                                }, function () { cell.url = ''; call(); });
+                                 // Вместо self.getStreamYani, сразу используем iframe_url
+                                    element.loading = false; // Убедитесь, что загрузка завершена
+                                
+                                    var first = {
+                                        url: element.iframe_url, // Используем iframe_url как основную ссылку
+                                        quality: '360p ~ 1080p', // Можно получить из данных, если есть
+                                        subtitles: false, // Настройка субтитров может быть сложнее, зависит от плеера
+                                        timeline: element.timeline,
+                                        title: element.title // Или сформируйте заголовок, как вам нужно
+                                    };
+                                // self.getStreamYani(elem, function (elem) {
+                                //     cell.url = elem.stream;
+                                //     call();
+                                // }, function () { cell.url = ''; call(); });
                             } else {
                                 cell.url = elem.file;
                                 call();
