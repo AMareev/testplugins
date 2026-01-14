@@ -24,6 +24,9 @@ function component(object) {
 
     this.create = function () {
         var _this = this;
+        console.log('🎬 Movie object:', object.movie);
+console.log('🔢 kinopoisk_id raw:', object.movie.kinopoisk_id);
+console.log('🔢 kp_id parsed:', parseInt(object.movie.kinopoisk_id));
 
         this.activity.loader(true);
 
@@ -56,6 +59,7 @@ function component(object) {
             _this.changeBalanser(a.source);
           }
         };
+        
 
         filter.render().find('.filter--sort span').text(Lampa.Lang.translate('online_mod_balanser'));
         files.appendHead(filter.render());
@@ -136,28 +140,25 @@ function component(object) {
 
     // === ОСНОВНАЯ ЛОГИКА ===
 
-    this.search = function () {
+    function getValidKpId(id) {
+    if (!id || id === '0' || id === 'null' || id === '') return 0;
+    var num = parseInt(id, 10);
+    return isNaN(num) || num <= 0 ? 0 : num;
+}
+
+this.search = function () {
     select_title = object.search || object.movie.title;
-    var kp_id = object.movie.kinopoisk_id ? parseInt(object.movie.kinopoisk_id) : 0;
+    var kp_id = getValidKpId(object.movie.kinopoisk_id);
     var imdb_id = object.movie.imdb_id || '';
+
+    console.log('🔍 Parsed IDs — kp_id:', kp_id, 'imdb_id:', imdb_id);
 
     if (current_balancer === 'kodik') {
         self.searchKodik(kp_id, imdb_id);
     } else if (current_balancer === 'collaps') {
-        if (kp_id) {
-            self.searchCollaps(kp_id, '');
-        } else if (imdb_id) {
-            self.searchCollaps(0, imdb_id);
-        } else {
-            self.emptyForQuery(select_title);
-        }
+        self.searchCollaps(kp_id, imdb_id);
     } else if (current_balancer === 'yani') {
-        if (kp_id) {
-            self.searchYani(kp_id);
-        } else {
-            // Yani не работает без kp_id
-            self.emptyForQuery(select_title + ' (Yani требует ID из КиноПоиска)');
-        }
+        self.searchYani(kp_id); // может быть 0 — это нормально
     }
 };
 
@@ -416,12 +417,26 @@ function component(object) {
     };
 
     // === ОБЩИЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
-
     this.applyFilter = function (balancer) {
-        filter_items = { season: [], voice: [] };
+    // ВСЕГДА обновляем список источников
+    var sources = [
+        { title: 'Kodik', selected: current_balancer === 'kodik' },
+        { title: 'Collaps', selected: current_balancer === 'collaps' },
+        { title: 'Yani', selected: current_balancer === 'yani' }
+    ];
 
-        if (balancer === 'kodik') {
-            var data = extract.kodik;
+    var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
+    select.push({
+        title: Lampa.Lang.translate('settings_rest_source'),
+        subtitle: current_balancer === 'kodik' ? 'Kodik' :
+                  current_balancer === 'collaps' ? 'Collaps' : 'Yani',
+        items: sources.map((s, i) => ({ title: s.title, selected: s.selected, index: i })),
+        stype: 'source'
+    });
+
+    // Дополнительные фильтры (сезон, озвучка) — только если есть данные
+    if (balancer === 'kodik' && extract.kodik) {
+       var data = extract.kodik;
             filter_items.season = data.seasons.map(s => s.title);
             if (filter_items.season.length) {
                 var season_id = data.seasons[choice.season]?.id;
@@ -433,53 +448,86 @@ function component(object) {
                     }
                 });
             }
-        } else if (balancer === 'collaps') {
-            var pl = extract.collaps.playlist;
+    } else if (balancer === 'collaps' && extract.collaps) {
+       var pl = extract.collaps.playlist;
             if (pl && pl.seasons) {
                 filter_items.season = pl.seasons.map(s => Lampa.Lang.translate('torrent_serial_season') + ' ' + s.season);
             }
-        } else if (balancer === 'yani') {
-            self.getStreamYani(element, function (element) {
+    } else if (balancer === 'yani' && extract.yani) {
+        self.getStreamYani(element, function (element) {
                 self.playElement(element, items, balancer);
             }, function () {
                 element.loading = false;
                 Lampa.Noty.show(Lampa.Lang.translate('online_mod_nolink'));
             });
-        }
+    }
 
-        var sources = [
-            { title: 'Kodik', selected: current_balancer === 'kodik' },
-            { title: 'Collaps', selected: current_balancer === 'collaps' },
-            { title: 'Yani', selected: current_balancer === 'yani' }
-        ];
+    filter.set('filter', select);
+};
 
-        var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
-        select.push({
-            title: Lampa.Lang.translate('settings_rest_source'),
-            subtitle: current_balancer === 'kodik' ? 'Kodik' : 'Collaps',
-            items: sources.map((s, i) => ({ title: s.title, selected: s.selected, index: i })),
-            stype: 'source'
-        });
+    // this.applyFilter = function (balancer) {
+    //     filter_items = { season: [], voice: [] };
 
-        if (filter_items.season.length > 1) {
-            select.push({
-                title: Lampa.Lang.translate('torrent_serial_season'),
-                subtitle: filter_items.season[choice.season],
-                items: filter_items.season.map((t, i) => ({ title: t, selected: i === choice.season, index: i })),
-                stype: 'season'
-            });
-        }
-        if (filter_items.voice.length) {
-            select.push({
-                title: Lampa.Lang.translate('torrent_parser_voice'),
-                subtitle: filter_items.voice[choice.voice]?.title || '',
-                items: filter_items.voice.map((v, i) => ({ title: v.title, selected: i === choice.voice, index: i })),
-                stype: 'voice'
-            });
-        }
+    //     if (balancer === 'kodik') {
+    //         var data = extract.kodik;
+    //         filter_items.season = data.seasons.map(s => s.title);
+    //         if (filter_items.season.length) {
+    //             var season_id = data.seasons[choice.season]?.id;
+    //             data.items.forEach(c => {
+    //                 if (c.seasons?.[season_id] && c.translation) {
+    //                     if (!filter_items.voice.some(v => v.id === c.translation.id)) {
+    //                         filter_items.voice.push({ id: c.translation.id, title: c.translation.title });
+    //                     }
+    //                 }
+    //             });
+    //         }
+    //     } else if (balancer === 'collaps') {
+    //         var pl = extract.collaps.playlist;
+    //         if (pl && pl.seasons) {
+    //             filter_items.season = pl.seasons.map(s => Lampa.Lang.translate('torrent_serial_season') + ' ' + s.season);
+    //         }
+    //     } else if (balancer === 'yani') {
+    //         self.getStreamYani(element, function (element) {
+    //             self.playElement(element, items, balancer);
+    //         }, function () {
+    //             element.loading = false;
+    //             Lampa.Noty.show(Lampa.Lang.translate('online_mod_nolink'));
+    //         });
+    //     }
 
-        filter.set('filter', select);
-    };
+    //     var sources = [
+    //         { title: 'Kodik', selected: current_balancer === 'kodik' },
+    //         { title: 'Collaps', selected: current_balancer === 'collaps' },
+    //         { title: 'Yani', selected: current_balancer === 'yani' }
+    //     ];
+
+    //     var select = [{ title: Lampa.Lang.translate('torrent_parser_reset'), reset: true }];
+    //     select.push({
+    //         title: Lampa.Lang.translate('settings_rest_source'),
+    //         subtitle: current_balancer === 'kodik' ? 'Kodik' : 'Collaps',
+    //         items: sources.map((s, i) => ({ title: s.title, selected: s.selected, index: i })),
+    //         stype: 'source'
+    //     });
+
+    //     if (filter_items.season.length > 1) {
+    //         select.push({
+    //             title: Lampa.Lang.translate('torrent_serial_season'),
+    //             subtitle: filter_items.season[choice.season],
+    //             items: filter_items.season.map((t, i) => ({ title: t, selected: i === choice.season, index: i })),
+    //             stype: 'season'
+    //         });
+    //     }
+    //     if (filter_items.voice.length) {
+    //         select.push({
+    //             title: Lampa.Lang.translate('torrent_parser_voice'),
+    //             subtitle: filter_items.voice[choice.voice]?.title || '',
+    //             items: filter_items.voice.map((v, i) => ({ title: v.title, selected: i === choice.voice, index: i })),
+    //             stype: 'voice'
+    //         });
+    //     }
+
+    //     filter.set('filter', select);
+    // };
 
     var lastItem = null;
     var filter_items = {};
